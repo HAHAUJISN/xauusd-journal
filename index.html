@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XAU/USD Journal</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0a0a0c; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    select option { background: #1a1a1f; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const STORAGE_KEY = "xauusd-journal-trades-v2";
+    const ACCOUNT_KEY = "xauusd-journal-account";
+    const DEFAULT_ACCOUNT = { balance: 10000, riskPercent: 1, currency: 'USD' };
+    const CURRENCY_SYMBOLS = { USD: '$', GBP: '£', EUR: '€' };
+
+    const initialForm = {
+      mode: "backtest", date: "", time: "", session: "London", direction: "Long",
+      entryPrice: "", stopLoss: "", takeProfit: "", lotSize: "", exitPrice: "",
+      exitTime: "", status: "Open", setup: "", confluences: [], rr: "",
+      pnlDollars: "", riskDollars: "", notes: "", screenshot: "", emotion: "Neutral",
+    };
+
+    const CONFLUENCE_OPTIONS = [
+      "HTF Trend","BOS/CHoCH","Order Block","FVG","Liquidity Sweep",
+      "PDH/PDL","EMA Cross","Volume Spike","News Catalyst","Session Open",
+      "Support/Resistance","Golden Ratio","VWAP","Fibonacci",
+    ];
+    const SESSION_OPTS = ["Sydney","Tokyo","London","New York","London/NY Overlap"];
+    const EMOTION_OPTS = ["Disciplined","Confident","Neutral","Anxious","FOMO","Revenge"];
+    const SETUP_OPTS = ["ICT Breaker","OTE Retracement","Liquidity Grab","Market Structure Shift","Range Break","News Trade","Other"];
+
+    function calcPnL(direction, entry, exit, lots) {
+      const e = parseFloat(entry), x = parseFloat(exit), l = parseFloat(lots);
+      if (!e || !x || !l) return "";
+      const diff = direction === "Long" ? (x - e) : (e - x);
+      return (diff * l * 100).toFixed(2);
+    }
+    function calcRR(entry, sl, tp) {
+      const e = parseFloat(entry), s = parseFloat(sl), t = parseFloat(tp);
+      if (!e || !s || !t) return "";
+      const risk = Math.abs(e - s), reward = Math.abs(t - e);
+      if (risk === 0) return "";
+      return (reward / risk).toFixed(2);
+    }
+    function calcLotSize(entry, sl, riskDollars) {
+      const e = parseFloat(entry), s = parseFloat(sl), r = parseFloat(riskDollars);
+      if (!e || !s || !r) return "";
+      const slMove = Math.abs(e - s);
+      if (slMove < 0.01) return "";
+      const pips = slMove / 0.01;
+      const lots = r / pips;
+      if (lots > 100) return "100.00";
+      if (lots < 0.01) return "0.01";
+      return lots.toFixed(2);
+    }
+    function detectSessionPrecise(gmtTime) {
+      if (!gmtTime) return "London";
+      const [h, m] = gmtTime.split(":").map(Number);
+      const mins = h * 60 + m;
+      if (mins >= 12*60 && mins < 16*60) return "London/NY Overlap";
+      if (mins >= 7*60  && mins < 12*60) return "London";
+      if (mins >= 16*60 && mins < 21*60) return "New York";
+      if (mins >= 0     && mins < 6*60)  return "Tokyo";
+      return "Sydney";
+    }
+
+    function App() {
+      const [trades, setTrades] = useState([]);
+      const [account, setAccount] = useState(DEFAULT_ACCOUNT);
+      const [form, setForm] = useState({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5) });
+      const [view, setView] = useState("journal");
+      const [selected, setSelected] = useState(null);
+      const [filterMode, setFilterMode] = useState("All");
+      const [filterDir, setFilterDir] = useState("All");
+      const [spotPrice, setSpotPrice] = useState("");
+      const [editId, setEditId] = useState(null);
+      const [toast, setToast] = useState("");
+      const [showSettings, setShowSettings] = useState(false);
+      const [settingsForm, setSettingsForm] = useState(DEFAULT_ACCOUNT);
+
+      useEffect(() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) setTrades(JSON.parse(saved));
+          const acc = localStorage.getItem(ACCOUNT_KEY);
+          if (acc) { const a = JSON.parse(acc); setAccount(a); setSettingsForm(a); }
+        } catch {}
+      }, []);
+      useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trades)); } catch {} }, [trades]);
+      useEffect(() => { try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch {} }, [account]);
+
+      function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2800); }
+
+      function goToAdd() {
+        const riskAmt = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
+        setForm({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5), riskDollars: riskAmt });
+        setEditId(null);
+        setView("add");
+      }
+
+      function handleFormChange(key, val) {
+        setForm(f => {
+          let u = { ...f, [key]: val };
+          const riskAmt = parseFloat(account.balance) * parseFloat(account.riskPercent) / 100;
+          u.riskDollars = riskAmt.toFixed(2);
+          if (key === "time") u.session = detectSessionPrecise(u.time);
+          if (u.entryPrice && u.stopLoss) {
+            const autoLots = calcLotSize(u.entryPrice, u.stopLoss, riskAmt);
+            if (autoLots) u.lotSize = autoLots;
+          }
+          u.rr = calcRR(u.entryPrice, u.stopLoss, u.takeProfit);
+          if (key === "status") {
+            if (val === "Win")       u.exitPrice = u.takeProfit || u.exitPrice;
+            if (val === "Loss")      u.exitPrice = u.stopLoss   || u.exitPrice;
+            if (val === "Breakeven") u.exitPrice = u.entryPrice || u.exitPrice;
+            if (val === "Open")      u.exitPrice = "";
+          }
+          u.pnlDollars = (u.exitPrice && u.status !== "Open")
+            ? calcPnL(u.direction, u.entryPrice, u.exitPrice, u.lotSize) : "";
+          return u;
+        });
+      }
+
+      function applyAccountToForm(newAcc) {
+        setForm(f => {
+          const riskAmt = parseFloat(newAcc.balance) * parseFloat(newAcc.riskPercent) / 100;
+          const u = { ...f, riskDollars: riskAmt.toFixed(2) };
+          if (u.entryPrice && u.stopLoss) { const l = calcLotSize(u.entryPrice, u.stopLoss, riskAmt); if (l) u.lotSize = l; }
+          if (u.exitPrice && u.status !== "Open") u.pnlDollars = calcPnL(u.direction, u.entryPrice, u.exitPrice, u.lotSize);
+          if (u.time) u.session = detectSessionPrecise(u.time);
+          return u;
+        });
+      }
+
+      function toggleConfluence(c) {
+        setForm(f => ({ ...f, confluences: f.confluences.includes(c) ? f.confluences.filter(x => x !== c) : [...f.confluences, c] }));
+      }
+
+      function saveTrade() {
+        if (!form.entryPrice || !form.date) { showToast("Entry price and date required"); return; }
+        if (editId !== null) {
+          setTrades(t => t.map(tr => tr.id === editId ? { ...form, id: editId } : tr));
+          showToast("Trade updated ✓");
+        } else {
+          setTrades(t => [{ ...form, id: Date.now(), currency: account.currency || 'USD' }, ...t]);
+          showToast("Trade saved ✓");
+        }
+        const riskAmt = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
+        setForm({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5), riskDollars: riskAmt });
+        setEditId(null); setView("journal");
+      }
+
+      function deleteTrade(id) { setTrades(t => t.filter(tr => tr.id !== id)); setSelected(null); setView("journal"); showToast("Trade deleted"); }
+      function editTrade(trade) { setForm({ ...trade }); setEditId(trade.id); setView("add"); }
+
+      const sym = CURRENCY_SYMBOLS[account.currency || 'USD'];
+      const filtered = trades.filter(t => (filterMode === "All" || t.mode === filterMode) && (filterDir === "All" || t.direction === filterDir));
+      const closedTrades = trades.filter(t => t.status !== "Open" && t.pnlDollars !== "");
+      const totalPnL = closedTrades.reduce((s, t) => s + parseFloat(t.pnlDollars || 0), 0);
+      const wins = closedTrades.filter(t => parseFloat(t.pnlDollars) > 0).length;
+      const losses = closedTrades.filter(t => parseFloat(t.pnlDollars) < 0).length;
+      const winRate = closedTrades.length ? ((wins / closedTrades.length) * 100).toFixed(1) : "—";
+      const avgRR = closedTrades.filter(t => t.rr).length
+        ? (closedTrades.reduce((s, t) => s + parseFloat(t.rr || 0), 0) / closedTrades.filter(t => t.rr).length).toFixed(2) : "—";
+      const riskPerTrade = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
+      const currentBalance = (parseFloat(account.balance) + totalPnL).toFixed(2);
+
+      const S = styles;
+
+      return (
+        <div style={S.root}>
+          {/* HEADER */}
+          <header style={S.header}>
+            <div style={S.headerLeft}>
+              <span style={S.logo}>⬡</span>
+              <div>
+                <div style={S.title}>XAU/USD Journal</div>
+                <div style={S.subtitle}>Trade Intelligence System</div>
+              </div>
+            </div>
+            <div style={S.headerRight}>
+              <div style={S.balanceBox}>
+                <span style={S.balLabel}>BALANCE</span>
+                <span style={{ ...S.balVal, color: totalPnL >= 0 ? "#4ade80" : "#f87171" }}>
+                  {sym}{parseFloat(currentBalance).toLocaleString()}
+                </span>
+              </div>
+              <div style={S.riskBadge}>
+                <span style={S.riskLabel}>RISK/TRADE</span>
+                <span style={S.riskVal}>{sym}{riskPerTrade} ({account.riskPercent}%)</span>
+              </div>
+              <div style={S.spotBox}>
+                <span style={S.spotLabel}>SPOT</span>
+                <input style={S.spotInput} value={spotPrice} onChange={e => setSpotPrice(e.target.value)} placeholder="price" />
+              </div>
+              <button style={S.settingsBtn} onClick={() => { setSettingsForm({...account}); setShowSettings(true); }}>⚙</button>
+            </div>
+          </header>
+
+          {/* NAV */}
+          <nav style={S.nav}>
+            {[["journal","JOURNAL"],["add","NEW TRADE"],["stats","ANALYTICS"]].map(([v,label]) => (
+              <button key={v} style={{ ...S.navBtn, ...(view === v ? S.navActive : {}) }}
+                onClick={() => { if (v === "add" && view !== "add") goToAdd(); else setView(v); }}>
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          <main style={S.main}>
+
+            {/* ── JOURNAL ── */}
+            {view === "journal" && (
+              <div>
+                <div style={S.filterRow}>
+                  <div style={S.filterGroup}>
+                    <span style={S.filterLabel}>MODE</span>
+                    {["All","backtest","live"].map(m => (
+                      <button key={m} style={{ ...S.pill, ...(filterMode === m ? S.pillActive : {}) }}
+                        onClick={() => setFilterMode(m)}>{m.toUpperCase()}</button>
+                    ))}
+                  </div>
+                  <div style={S.filterGroup}>
+                    <span style={S.filterLabel}>DIR</span>
+                    {["All","Long","Short"].map(d => (
+                      <button key={d} style={{ ...S.pill, ...(filterDir === d ? S.pillActive : {}) }}
+                        onClick={() => setFilterDir(d)}>{d.toUpperCase()}</button>
+                    ))}
+                  </div>
+                  <span style={S.tradeCount}>{filtered.length} TRADES</span>
+                  <button style={S.logBtn} onClick={goToAdd}>+ LOG TRADE</button>
+                </div>
+
+                {filtered.length === 0 ? (
+                  <div style={S.empty}>
+                    <div style={S.emptyIcon}>◈</div>
+                    <div style={{ marginBottom:8 }}>No trades yet</div>
+                    <button style={S.ctaBtn} onClick={goToAdd}>Log First Trade</button>
+                  </div>
+                ) : (
+                  <div style={S.tradeList}>
+                    {filtered.map(trade => {
+                      const pnl = parseFloat(trade.pnlDollars || 0);
+                      const isWin = pnl > 0, isLoss = pnl < 0;
+                      const tSym = CURRENCY_SYMBOLS[trade.currency || account.currency || 'USD'];
+                      return (
+                        <div key={trade.id}
+                          style={{ ...S.tradeCard, ...(isWin ? S.cardWin : isLoss ? S.cardLoss : {}) }}
+                          onClick={() => { setSelected(trade); setView("detail"); }}>
+                          <div style={S.cardTop}>
+                            <div style={S.cardLeft}>
+                              <span style={{ ...S.modeBadge, ...(trade.mode === "live" ? S.modeLive : S.modeBacktest) }}>
+                                {trade.mode === "live" ? "● LIVE" : "◆ BT"}
+                              </span>
+                              <span style={{ ...S.dirBadge, ...(trade.direction === "Long" ? S.longBadge : S.shortBadge) }}>
+                                {trade.direction === "Long" ? "▲" : "▼"} {trade.direction.toUpperCase()}
+                              </span>
+                              <span style={S.cardSession}>{trade.session}</span>
+                              {trade.setup && <span style={S.setupTagSmall}>{trade.setup}</span>}
+                            </div>
+                            <div style={S.cardRight}>
+                              {trade.pnlDollars !== "" && (
+                                <span style={{ ...S.pnlTag, color: isWin ? "#4ade80" : isLoss ? "#f87171" : "#aaa" }}>
+                                  {isWin ? "+" : ""}{trade.pnlDollars} {trade.currency||'USD'}
+                                </span>
+                              )}
+                              {trade.status === "Open" && <span style={S.openTag}>OPEN</span>}
+                            </div>
+                          </div>
+                          <div style={S.cardMid}>
+                            <div style={S.priceRow}>
+                              <span style={S.priceLabel}>ENTRY</span><span style={S.priceVal}>{trade.entryPrice}</span>
+                              {trade.stopLoss && <><span style={S.priceLabel}>SL</span><span style={{ ...S.priceVal, color:"#f87171" }}>{trade.stopLoss}</span></>}
+                              {trade.takeProfit && <><span style={S.priceLabel}>TP</span><span style={{ ...S.priceVal, color:"#4ade80" }}>{trade.takeProfit}</span></>}
+                              {trade.exitPrice && trade.status !== "Open" && <><span style={S.priceLabel}>EXIT</span><span style={S.priceVal}>{trade.exitPrice}</span></>}
+                              {trade.rr && <span style={S.rrTag}>1:{trade.rr}R</span>}
+                            </div>
+                          </div>
+                          <div style={S.cardBot}>
+                            <span style={S.dateText}>{trade.date}{trade.time && ` • ${trade.time}`}</span>
+                            <span style={S.lotText}>{trade.lotSize && `${trade.lotSize} lots`}{trade.riskDollars && ` • ${tSym}${trade.riskDollars} risk`}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── ADD / EDIT ── */}
+            {view === "add" && (
+              <div style={S.formContainer}>
+                <div style={S.formTitle}>{editId ? "EDIT TRADE" : "LOG TRADE"}</div>
+                <div style={S.riskBanner}>
+                  <span style={S.riskBannerLabel}>AUTO RISK</span>
+                  <span style={S.riskBannerVal}>
+                    {sym}{riskPerTrade} ({account.riskPercent}% of {sym}{parseFloat(account.balance).toLocaleString()})
+                    {form.lotSize && ` → ${form.lotSize} lots`}
+                  </span>
+                  <button style={S.riskEditBtn} onClick={() => { setSettingsForm({...account}); setShowSettings(true); }}>Edit</button>
+                </div>
+
+                <div style={S.formRow}>
+                  <FF label="MODE"><Seg options={["backtest","live"]} value={form.mode} onChange={v => handleFormChange("mode",v)} /></FF>
+                  <FF label="DIRECTION"><Seg options={["Long","Short"]} value={form.direction} onChange={v => handleFormChange("direction",v)} colors={{ Long:"#4ade80", Short:"#f87171" }} /></FF>
+                </div>
+
+                <FF label="OUTCOME">
+                  <div style={S.statusRow}>
+                    {["Open","Win","Loss","Breakeven"].map(s => (
+                      <button key={s}
+                        style={{ ...S.statusBtn, ...(form.status===s ? {Open:S.statusOpen,Win:S.statusWin,Loss:S.statusLoss,Breakeven:S.statusBE}[s] : {}) }}
+                        onClick={() => handleFormChange("status",s)}>
+                        {s==="Win"?"✓ WIN":s==="Loss"?"✗ LOSS":s==="Breakeven"?"≈ BE":"○ OPEN"}
+                      </button>
+                    ))}
+                  </div>
+                  {(form.status==="Win"||form.status==="Loss") && form.exitPrice && (
+                    <div style={S.autoFillHint}>↳ Exit auto-set to {form.status==="Win"?"TP":"SL"}: <strong>{form.exitPrice}</strong></div>
+                  )}
+                </FF>
+
+                <div style={S.formRow}>
+                  <FF label="DATE"><input style={S.input} type="date" value={form.date} onChange={e => handleFormChange("date",e.target.value)} /></FF>
+                  <FF label="ENTRY TIME (GMT)"><input style={S.input} type="time" value={form.time} onChange={e => handleFormChange("time",e.target.value)} /></FF>
+                  <FF label="SESSION (AUTO)">
+                    <select style={S.input} value={form.session} onChange={e => handleFormChange("session",e.target.value)}>
+                      {SESSION_OPTS.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  </FF>
+                </div>
+
+                <div style={S.formRow}>
+                  <FF label="ENTRY PRICE *"><input style={S.input} type="number" step="0.01" value={form.entryPrice} onChange={e => handleFormChange("entryPrice",e.target.value)} placeholder="2345.00" /></FF>
+                  <FF label="STOP LOSS"><input style={{ ...S.input, borderColor:"#f8717166" }} type="number" step="0.01" value={form.stopLoss} onChange={e => handleFormChange("stopLoss",e.target.value)} placeholder="2335.00" /></FF>
+                  <FF label="TAKE PROFIT"><input style={{ ...S.input, borderColor:"#4ade8066" }} type="number" step="0.01" value={form.takeProfit} onChange={e => handleFormChange("takeProfit",e.target.value)} placeholder="2365.00" /></FF>
+                </div>
+
+                {(form.rr || form.lotSize) && (
+                  <div style={S.autoStrip}>
+                    {form.lotSize && (
+                      <div style={S.autoChip}>
+                        <span style={S.chipLabel}>LOT SIZE (AUTO)</span>
+                        <span style={{ ...S.chipVal, color: parseFloat(form.lotSize)>10?"#f87171":"#e8e0d0" }}>{form.lotSize}{parseFloat(form.lotSize)>10?" ⚠":""}</span>
+                      </div>
+                    )}
+                    {form.rr && <div style={S.autoChip}><span style={S.chipLabel}>R:R</span><span style={{ ...S.chipVal, color:"#a78bfa" }}>1:{form.rr}</span></div>}
+                    {form.riskDollars && <div style={S.autoChip}><span style={S.chipLabel}>RISK</span><span style={{ ...S.chipVal, color:"#f87171" }}>{sym}{form.riskDollars}</span></div>}
+                    {form.entryPrice && form.stopLoss && (
+                      <div style={S.autoChip}>
+                        <span style={S.chipLabel}>SL PIPS</span>
+                        <span style={{ ...S.chipVal, fontSize:12, color:"#888" }}>{Math.round(Math.abs(parseFloat(form.entryPrice||0)-parseFloat(form.stopLoss||0))/0.01)} pips</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {form.lotSize && parseFloat(form.lotSize)>10 && <div style={S.warnBanner}>⚠ Lot size {form.lotSize} is very large — SL may be too tight.</div>}
+                {form.entryPrice && form.stopLoss && form.direction==="Long" && parseFloat(form.stopLoss)>parseFloat(form.entryPrice) && (
+                  <div style={S.warnBanner}>⚠ Long trade but SL is above entry — did you mean to enter TP there?</div>
+                )}
+                {form.entryPrice && form.stopLoss && form.direction==="Short" && parseFloat(form.stopLoss)<parseFloat(form.entryPrice) && (
+                  <div style={S.warnBanner}>⚠ Short trade but SL is below entry — did you mean to enter TP there?</div>
+                )}
+
+                <div style={S.formRow}>
+                  <FF label="LOT SIZE (AUTO)"><input style={{ ...S.input, color:"#a78bfa" }} type="number" step="0.01" value={form.lotSize} onChange={e => handleFormChange("lotSize",e.target.value)} placeholder="auto" /></FF>
+                  <FF label="EXIT PRICE (AUTO)"><input style={S.input} type="number" step="0.01" value={form.exitPrice} onChange={e => handleFormChange("exitPrice",e.target.value)} placeholder="auto on Win/Loss" /></FF>
+                  <FF label="EXIT TIME"><input style={S.input} type="time" value={form.exitTime} onChange={e => handleFormChange("exitTime",e.target.value)} /></FF>
+                </div>
+
+                {form.pnlDollars && (
+                  <div style={{ ...S.autoStrip, background:parseFloat(form.pnlDollars)>0?"#4ade8012":"#f8717112", borderColor:parseFloat(form.pnlDollars)>0?"#4ade8044":"#f8717144" }}>
+                    <div style={S.autoChip}>
+                      <span style={S.chipLabel}>P&L</span>
+                      <span style={{ ...S.chipVal, fontSize:18, color:parseFloat(form.pnlDollars)>0?"#4ade80":"#f87171" }}>
+                        {parseFloat(form.pnlDollars)>0?"+":""}{form.pnlDollars} {account.currency||'USD'}
+                      </span>
+                    </div>
+                    {form.rr && form.riskDollars && (
+                      <div style={S.autoChip}>
+                        <span style={S.chipLabel}>RESULT</span>
+                        <span style={{ ...S.chipVal, color:"#a78bfa" }}>{(parseFloat(form.pnlDollars)/parseFloat(form.riskDollars)).toFixed(2)}R</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <FF label="SETUP">
+                  <select style={S.input} value={form.setup} onChange={e => handleFormChange("setup",e.target.value)}>
+                    <option value="">— Select —</option>
+                    {SETUP_OPTS.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </FF>
+
+                <FF label="CONFLUENCES">
+                  <div style={S.confGrid}>
+                    {CONFLUENCE_OPTIONS.map(c => (
+                      <button key={c} style={{ ...S.confBtn, ...(form.confluences.includes(c)?S.confActive:{}) }} onClick={() => toggleConfluence(c)}>{c}</button>
+                    ))}
+                  </div>
+                </FF>
+
+                <FF label="EMOTIONAL STATE">
+                  <div style={S.confGrid}>
+                    {EMOTION_OPTS.map(e => (
+                      <button key={e} style={{ ...S.confBtn, ...(form.emotion===e?S.confActive:{}) }} onClick={() => handleFormChange("emotion",e)}>{e}</button>
+                    ))}
+                  </div>
+                </FF>
+
+                <FF label="TRADE NOTES">
+                  <textarea style={{ ...S.input, height:80, resize:"vertical" }} value={form.notes}
+                    onChange={e => handleFormChange("notes",e.target.value)} placeholder="Setup reasoning, market context..." />
+                </FF>
+
+                <FF label="SCREENSHOT URL">
+                  <input style={S.input} type="url" value={form.screenshot}
+                    onChange={e => handleFormChange("screenshot",e.target.value)} placeholder="https://tradingview.com/x/..." />
+                </FF>
+
+                <div style={S.formActions}>
+                  <button style={S.cancelBtn} onClick={() => { setView("journal"); setEditId(null); }}>CANCEL</button>
+                  <button style={S.saveBtn} onClick={saveTrade}>{editId ? "UPDATE TRADE" : "SAVE TRADE"}</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── DETAIL ── */}
+            {view === "detail" && selected && (() => {
+              const trade = trades.find(t => t.id === selected.id) || selected;
+              const pnl = parseFloat(trade.pnlDollars || 0);
+              const tSym = CURRENCY_SYMBOLS[trade.currency || account.currency || 'USD'];
+              const rResult = trade.riskDollars && trade.pnlDollars ? (pnl/parseFloat(trade.riskDollars)).toFixed(2) : null;
+              return (
+                <div style={S.detailContainer}>
+                  <button style={S.backBtn} onClick={() => setView("journal")}>← BACK</button>
+                  <div style={S.detailHeader}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+                      <span style={{ ...S.modeBadge, ...(trade.mode==="live"?S.modeLive:S.modeBacktest) }}>{trade.mode==="live"?"● LIVE":"◆ BACKTEST"}</span>
+                      <span style={{ ...S.dirBadge, ...(trade.direction==="Long"?S.longBadge:S.shortBadge) }}>{trade.direction==="Long"?"▲":"▼"} {trade.direction}</span>
+                      <span style={S.cardSession}>{trade.session}</span>
+                      {trade.setup && <span style={S.setupTagSmall}>{trade.setup}</span>}
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      {trade.pnlDollars !== "" && <div style={{ ...S.bigPnL, color:pnl>0?"#4ade80":pnl<0?"#f87171":"#aaa" }}>{pnl>0?"+":""}{trade.pnlDollars} {trade.currency||'USD'}</div>}
+                      {rResult && <div style={{ fontSize:13, color:"#a78bfa", fontFamily:"'Space Mono',monospace" }}>{parseFloat(rResult)>0?"+":""}{rResult}R</div>}
+                    </div>
+                  </div>
+                  <div style={S.detailGrid}>
+                    {[["Date",trade.date],["Entry Time",trade.time],["Exit Time",trade.exitTime],
+                      ["Entry",trade.entryPrice],["Stop Loss",trade.stopLoss],["Take Profit",trade.takeProfit],
+                      ["Exit Price",trade.exitPrice],["Lot Size",trade.lotSize],["R:R",trade.rr?`1:${trade.rr}`:""],
+                      ["Risk",trade.riskDollars?`${tSym}${trade.riskDollars}`:""],["Status",trade.status],["Emotion",trade.emotion]
+                    ].filter(([,v])=>v).map(([label,val]) => (
+                      <div key={label} style={S.detailStat}><div style={S.detailStatLabel}>{label}</div><div style={S.detailStatVal}>{val}</div></div>
+                    ))}
+                  </div>
+                  {trade.confluences?.length>0 && <div style={S.detailSection}><div style={S.sectionLabel}>CONFLUENCES</div><div style={S.confGrid}>{trade.confluences.map(c=><span key={c} style={S.confActive2}>{c}</span>)}</div></div>}
+                  {trade.notes && <div style={S.detailSection}><div style={S.sectionLabel}>NOTES</div><div style={S.notesBox}>{trade.notes}</div></div>}
+                  {trade.screenshot && <div style={S.detailSection}><div style={S.sectionLabel}>SCREENSHOT</div><a href={trade.screenshot} target="_blank" rel="noopener noreferrer" style={S.screenshotLink}>Open Chart →</a></div>}
+                  <div style={S.detailActions}>
+                    <button style={S.editBtn} onClick={() => editTrade(trade)}>EDIT</button>
+                    <button style={S.deleteBtn} onClick={() => deleteTrade(trade.id)}>DELETE</button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── ANALYTICS ── */}
+            {view === "stats" && (
+              <div style={S.statsContainer}>
+                <div style={S.statsTitle}>PERFORMANCE ANALYTICS</div>
+                <div style={S.statsGrid}>
+                  <StatCard label={`BALANCE (${account.currency||'USD'})`} value={`${sym}${parseFloat(currentBalance).toLocaleString()}`} color={totalPnL>=0?"#4ade80":"#f87171"} />
+                  <StatCard label={`TOTAL P&L (${account.currency||'USD'})`} value={`${totalPnL>=0?"+":""}${sym}${totalPnL.toFixed(2)}`} color={totalPnL>=0?"#4ade80":"#f87171"} />
+                  <StatCard label="WIN RATE" value={`${winRate}%`} />
+                  <StatCard label="AVG R:R" value={avgRR!=="—"?`1:${avgRR}`:"—"} color="#a78bfa" />
+                  <StatCard label="WINS" value={wins} color="#4ade80" />
+                  <StatCard label="LOSSES" value={losses} color="#f87171" />
+                  <StatCard label="TOTAL TRADES" value={trades.length} />
+                  <StatCard label="RISK/TRADE" value={`${sym}${riskPerTrade}`} color="#e2c87b" />
+                </div>
+
+                {closedTrades.length > 1 && (() => {
+                  const sorted = [...closedTrades].sort((a,b) => new Date(a.date+" "+(a.time||"00:00"))-new Date(b.date+" "+(b.time||"00:00")));
+                  let bal = parseFloat(account.balance);
+                  const points = sorted.map((t,i) => { bal+=parseFloat(t.pnlDollars||0); return { i:i+1, bal }; });
+                  const min=Math.min(...points.map(p=>p.bal)), max=Math.max(...points.map(p=>p.bal)), range=max-min||1;
+                  const H=80;
+                  const pts = points.map((p,i) => `${(i/(points.length-1))*100},${H-((p.bal-min)/range)*H}`).join(" ");
+                  const lastBal = points[points.length-1].bal;
+                  return (
+                    <div style={S.detailSection}>
+                      <div style={S.sectionLabel}>EQUITY CURVE</div>
+                      <div style={S.equityBox}>
+                        <svg viewBox={`0 0 100 ${H}`} style={{ width:"100%", height:80 }} preserveAspectRatio="none">
+                          <polyline points={pts} fill="none" stroke={lastBal>=parseFloat(account.balance)?"#4ade80":"#f87171"} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                        <div style={S.equityMeta}>
+                          <span style={S.equityStart}>{sym}{parseFloat(account.balance).toLocaleString()}</span>
+                          <span style={{ ...S.equityEnd, color:lastBal>=parseFloat(account.balance)?"#4ade80":"#f87171" }}>{sym}{lastBal.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {closedTrades.length > 0 && (() => {
+                  const bySetup = {};
+                  closedTrades.forEach(t => { const s=t.setup||"Untagged"; if(!bySetup[s]) bySetup[s]={count:0,pnl:0,wins:0}; bySetup[s].count++; bySetup[s].pnl+=parseFloat(t.pnlDollars||0); if(parseFloat(t.pnlDollars)>0) bySetup[s].wins++; });
+                  return (
+                    <div style={S.detailSection}>
+                      <div style={S.sectionLabel}>P&L BY SETUP</div>
+                      {Object.entries(bySetup).sort((a,b)=>b[1].pnl-a[1].pnl).map(([s,d]) => (
+                        <div key={s} style={S.setupRow}>
+                          <span style={S.setupName}>{s}</span>
+                          <span style={S.setupCount}>{d.count} trades</span>
+                          <span style={S.setupWR}>{((d.wins/d.count)*100).toFixed(0)}% WR</span>
+                          <span style={{ ...S.setupPnL, color:d.pnl>=0?"#4ade80":"#f87171" }}>{d.pnl>=0?"+":""}{sym}{d.pnl.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {closedTrades.length > 0 && (() => {
+                  const byEmo = {};
+                  closedTrades.forEach(t => { const e=t.emotion||"Neutral"; if(!byEmo[e]) byEmo[e]={count:0,pnl:0,wins:0}; byEmo[e].count++; byEmo[e].pnl+=parseFloat(t.pnlDollars||0); if(parseFloat(t.pnlDollars)>0) byEmo[e].wins++; });
+                  return (
+                    <div style={S.detailSection}>
+                      <div style={S.sectionLabel}>P&L BY EMOTION</div>
+                      {Object.entries(byEmo).sort((a,b)=>b[1].pnl-a[1].pnl).map(([e,d]) => (
+                        <div key={e} style={S.setupRow}>
+                          <span style={S.setupName}>{e}</span>
+                          <span style={S.setupCount}>{d.count} trades</span>
+                          <span style={S.setupWR}>{((d.wins/d.count)*100).toFixed(0)}% WR</span>
+                          <span style={{ ...S.setupPnL, color:d.pnl>=0?"#4ade80":"#f87171" }}>{d.pnl>=0?"+":""}{sym}{d.pnl.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <div style={S.detailSection}>
+                  <div style={S.sectionLabel}>EXPORT</div>
+                  <button style={S.exportBtn} onClick={() => {
+                    const csv = [
+                      ["Date","Time","Mode","Direction","Session","Setup","Entry","SL","TP","ExitPrice","ExitTime","Lots","Risk","RR","PnL","Status","Emotion","Notes"].join(","),
+                      ...trades.map(t => [t.date,t.time,t.mode,t.direction,t.session,t.setup,t.entryPrice,t.stopLoss,t.takeProfit,t.exitPrice,t.exitTime,t.lotSize,t.riskDollars,t.rr,t.pnlDollars,t.status,t.emotion,`"${(t.notes||"").replace(/"/g,'""')}"`].join(","))
+                    ].join("\n");
+                    const blob = new Blob([csv],{type:"text/csv"});
+                    const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="xauusd_journal.csv"; a.click();
+                  }}>EXPORT CSV</button>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* SETTINGS MODAL */}
+          {showSettings && (
+            <div style={S.modalOverlay} onClick={() => setShowSettings(false)}>
+              <div style={S.modal} onClick={e => e.stopPropagation()}>
+                <div style={S.modalTitle}>ACCOUNT SETTINGS</div>
+                <FF label="CURRENCY">
+                  <div style={S.riskRow}>
+                    {['USD','GBP','EUR'].map(c => (
+                      <button key={c} style={{ ...S.currencyBtn, ...(settingsForm.currency===c?S.currencyActive:{}) }}
+                        onClick={() => setSettingsForm(s => ({ ...s, currency:c }))}>
+                        {CURRENCY_SYMBOLS[c]} {c}
+                      </button>
+                    ))}
+                  </div>
+                </FF>
+                <FF label={`ACCOUNT BALANCE (${settingsForm.currency||'USD'})`}>
+                  <div style={{ position:"relative" }}>
+                    <span style={S.inputPrefix}>{CURRENCY_SYMBOLS[settingsForm.currency||'USD']}</span>
+                    <input style={{ ...S.input, paddingLeft:24 }} type="number" value={settingsForm.balance}
+                      onChange={e => setSettingsForm(s => ({ ...s, balance:e.target.value }))} placeholder="10000" />
+                  </div>
+                </FF>
+                <FF label="RISK PER TRADE (%)">
+                  <div style={S.riskRow}>
+                    {[0.5,1,1.5,2].map(r => (
+                      <button key={r} style={{ ...S.riskPill, ...(parseFloat(settingsForm.riskPercent)===r?S.riskPillActive:{}) }}
+                        onClick={() => setSettingsForm(s => ({ ...s, riskPercent:r }))}>{r}%</button>
+                    ))}
+                    <input style={{ ...S.input, width:70 }} type="number" step="0.1" value={settingsForm.riskPercent}
+                      onChange={e => setSettingsForm(s => ({ ...s, riskPercent:e.target.value }))} />
+                  </div>
+                </FF>
+                <div style={S.riskPreview}>
+                  Risk per trade: <strong style={{ color:"#e2c87b" }}>
+                    {CURRENCY_SYMBOLS[settingsForm.currency||'USD']}{(parseFloat(settingsForm.balance||0)*parseFloat(settingsForm.riskPercent||0)/100).toFixed(2)} {settingsForm.currency||'USD'}
+                  </strong>
+                </div>
+                <div style={S.formActions}>
+                  <button style={S.cancelBtn} onClick={() => setShowSettings(false)}>CANCEL</button>
+                  <button style={S.saveBtn} onClick={() => {
+                    const newAcc = { balance:parseFloat(settingsForm.balance), riskPercent:parseFloat(settingsForm.riskPercent), currency:settingsForm.currency||'USD' };
+                    setAccount(newAcc); applyAccountToForm(newAcc); setShowSettings(false); showToast("Settings saved ✓");
+                  }}>SAVE</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {view === "journal" && (
+            <button style={S.fab} onClick={goToAdd}>+</button>
+          )}
+
+          {toast && <div style={S.toast}>{toast}</div>}
+        </div>
+      );
+    }
+
+    function FF({ label, children }) {
+      return <div style={{ marginBottom:14 }}><div style={styles.fieldLabel}>{label}</div>{children}</div>;
+    }
+    function Seg({ options, value, onChange, colors={} }) {
+      return (
+        <div style={styles.segmentWrap}>
+          {options.map(o => (
+            <button key={o} style={{ ...styles.segBtn, ...(value===o?{ ...styles.segActive, ...(colors[o]?{background:colors[o]+"22",borderColor:colors[o],color:colors[o]}:{}) }:{}) }}
+              onClick={() => onChange(o)}>{o.toUpperCase()}</button>
+          ))}
+        </div>
+      );
+    }
+    function StatCard({ label, value, color="#e2c87b" }) {
+      return <div style={styles.statCard}><div style={styles.statLabel}>{label}</div><div style={{ ...styles.statVal, color }}>{value}</div></div>;
+    }
+
+    const styles = {
+      root:{ minHeight:"100vh", background:"#0a0a0c", color:"#e8e0d0", fontFamily:"'Syne',sans-serif", paddingBottom:60 },
+      header:{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", borderBottom:"1px solid #1e1e24", background:"#0d0d10", flexWrap:"wrap", gap:10 },
+      headerLeft:{ display:"flex", alignItems:"center", gap:12 },
+      logo:{ fontSize:26, color:"#e2c87b" },
+      title:{ fontSize:18, fontWeight:800, letterSpacing:"0.04em" },
+      subtitle:{ fontSize:9, letterSpacing:"0.2em", color:"#555", fontFamily:"'Space Mono',monospace" },
+      headerRight:{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" },
+      balanceBox:{ display:"flex", flexDirection:"column", alignItems:"flex-end", padding:"4px 10px", background:"#141418", border:"1px solid #2a2a32", borderRadius:6 },
+      balLabel:{ fontSize:8, letterSpacing:"0.15em", color:"#666", fontFamily:"'Space Mono',monospace" },
+      balVal:{ fontSize:14, fontWeight:700, fontFamily:"'Space Mono',monospace" },
+      riskBadge:{ display:"flex", flexDirection:"column", alignItems:"flex-end", padding:"4px 10px", background:"#141418", border:"1px solid #f8717133", borderRadius:6 },
+      riskLabel:{ fontSize:8, letterSpacing:"0.15em", color:"#f87171", fontFamily:"'Space Mono',monospace" },
+      riskVal:{ fontSize:11, color:"#f87171", fontFamily:"'Space Mono',monospace" },
+      spotBox:{ display:"flex", alignItems:"center", gap:6, background:"#141418", border:"1px solid #2a2a32", borderRadius:6, padding:"6px 10px" },
+      spotLabel:{ fontSize:9, letterSpacing:"0.15em", color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
+      spotInput:{ background:"none", border:"none", outline:"none", color:"#e8e0d0", fontFamily:"'Space Mono',monospace", fontSize:13, width:80 },
+      settingsBtn:{ background:"#141418", border:"1px solid #2a2a32", color:"#888", fontSize:16, padding:"6px 10px", borderRadius:6, cursor:"pointer" },
+      nav:{ display:"flex", gap:2, padding:"0 20px", borderBottom:"1px solid #1e1e24", background:"#0d0d10" },
+      navBtn:{ padding:"11px 18px", background:"none", border:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.15em", cursor:"pointer", borderBottom:"2px solid transparent", marginBottom:-1 },
+      navActive:{ color:"#e2c87b", borderBottomColor:"#e2c87b" },
+      main:{ maxWidth:900, margin:"0 auto", padding:"20px 16px" },
+      filterRow:{ display:"flex", alignItems:"center", gap:14, marginBottom:18, flexWrap:"wrap" },
+      filterGroup:{ display:"flex", alignItems:"center", gap:5 },
+      filterLabel:{ fontSize:9, letterSpacing:"0.15em", color:"#555", fontFamily:"'Space Mono',monospace" },
+      pill:{ padding:"3px 9px", border:"1px solid #2a2a32", borderRadius:20, background:"none", color:"#555", fontSize:9, letterSpacing:"0.1em", fontFamily:"'Space Mono',monospace", cursor:"pointer" },
+      pillActive:{ borderColor:"#e2c87b", color:"#e2c87b", background:"#e2c87b11" },
+      tradeCount:{ fontSize:10, color:"#444", fontFamily:"'Space Mono',monospace" },
+      logBtn:{ marginLeft:"auto", padding:"5px 14px", background:"#e2c87b", border:"none", borderRadius:4, color:"#0a0a0c", fontFamily:"'Space Mono',monospace", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em", whiteSpace:"nowrap" },
+      empty:{ textAlign:"center", padding:"70px 20px", color:"#555" },
+      emptyIcon:{ fontSize:44, color:"#2a2a32", marginBottom:14 },
+      ctaBtn:{ marginTop:16, padding:"9px 22px", background:"#e2c87b22", border:"1px solid #e2c87b55", color:"#e2c87b", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.1em", borderRadius:4, cursor:"pointer" },
+      tradeList:{ display:"flex", flexDirection:"column", gap:9 },
+      tradeCard:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:8, padding:"12px 14px", cursor:"pointer" },
+      cardWin:{ borderLeft:"3px solid #4ade8055" },
+      cardLoss:{ borderLeft:"3px solid #f8717155" },
+      cardTop:{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:7 },
+      cardLeft:{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" },
+      cardRight:{ display:"flex", alignItems:"center", gap:7 },
+      modeBadge:{ fontSize:8, letterSpacing:"0.12em", padding:"2px 6px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
+      modeLive:{ background:"#4ade8018", color:"#4ade80", border:"1px solid #4ade8040" },
+      modeBacktest:{ background:"#e2c87b18", color:"#e2c87b", border:"1px solid #e2c87b40" },
+      dirBadge:{ fontSize:9, padding:"2px 7px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
+      longBadge:{ background:"#4ade8018", color:"#4ade80", border:"1px solid #4ade8040" },
+      shortBadge:{ background:"#f8717118", color:"#f87171", border:"1px solid #f8717140" },
+      cardSession:{ fontSize:9, color:"#555", fontFamily:"'Space Mono',monospace" },
+      setupTagSmall:{ fontSize:9, color:"#60a5fa", background:"#60a5fa15", padding:"2px 7px", borderRadius:3, border:"1px solid #60a5fa30", fontFamily:"'Space Mono',monospace" },
+      pnlTag:{ fontSize:13, fontWeight:700, fontFamily:"'Space Mono',monospace" },
+      openTag:{ fontSize:8, color:"#e2c87b", border:"1px solid #e2c87b55", padding:"2px 6px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
+      cardMid:{ marginBottom:5 },
+      priceRow:{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" },
+      priceLabel:{ fontSize:8, color:"#444", letterSpacing:"0.1em", fontFamily:"'Space Mono',monospace" },
+      priceVal:{ fontSize:11, color:"#bbb", fontFamily:"'Space Mono',monospace" },
+      rrTag:{ fontSize:9, color:"#a78bfa", fontFamily:"'Space Mono',monospace", background:"#a78bfa18", padding:"1px 6px", borderRadius:3, border:"1px solid #a78bfa40" },
+      cardBot:{ display:"flex", justifyContent:"space-between" },
+      dateText:{ fontSize:9, color:"#444", fontFamily:"'Space Mono',monospace" },
+      lotText:{ fontSize:9, color:"#444", fontFamily:"'Space Mono',monospace" },
+      formContainer:{ maxWidth:680, margin:"0 auto" },
+      formTitle:{ fontSize:15, fontWeight:800, letterSpacing:"0.1em", marginBottom:18, color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
+      riskBanner:{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", background:"#f8717110", border:"1px solid #f8717133", borderRadius:6, marginBottom:18, flexWrap:"wrap" },
+      riskBannerLabel:{ fontSize:8, letterSpacing:"0.18em", color:"#f87171", fontFamily:"'Space Mono',monospace" },
+      riskBannerVal:{ fontSize:12, color:"#f87171", fontFamily:"'Space Mono',monospace", flex:1 },
+      riskEditBtn:{ fontSize:9, color:"#666", background:"none", border:"1px solid #333", padding:"2px 8px", borderRadius:3, cursor:"pointer", fontFamily:"'Space Mono',monospace" },
+      formRow:{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(170px, 1fr))", gap:10, marginBottom:4 },
+      fieldLabel:{ fontSize:8, letterSpacing:"0.2em", color:"#555", marginBottom:5, fontFamily:"'Space Mono',monospace" },
+      input:{ width:"100%", background:"#111115", border:"1px solid #2a2a32", borderRadius:5, padding:"8px 11px", color:"#e8e0d0", fontFamily:"'Space Mono',monospace", fontSize:12, outline:"none" },
+      statusRow:{ display:"flex", gap:8, flexWrap:"wrap" },
+      statusBtn:{ flex:1, minWidth:70, padding:"10px 8px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:5, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:700, cursor:"pointer", letterSpacing:"0.05em" },
+      statusOpen:{ background:"#e2c87b18", borderColor:"#e2c87b66", color:"#e2c87b" },
+      statusWin:{ background:"#4ade8022", borderColor:"#4ade8066", color:"#4ade80" },
+      statusLoss:{ background:"#f8717122", borderColor:"#f8717166", color:"#f87171" },
+      statusBE:{ background:"#60a5fa18", borderColor:"#60a5fa55", color:"#60a5fa" },
+      autoFillHint:{ fontSize:10, color:"#888", fontFamily:"'Space Mono',monospace", marginTop:6, paddingLeft:4 },
+      autoStrip:{ display:"flex", flexWrap:"wrap", gap:10, padding:"10px 14px", background:"#a78bfa0a", border:"1px solid #a78bfa22", borderRadius:6, marginBottom:14 },
+      autoChip:{ display:"flex", flexDirection:"column", gap:2 },
+      chipLabel:{ fontSize:7, letterSpacing:"0.18em", color:"#666", fontFamily:"'Space Mono',monospace" },
+      chipVal:{ fontSize:14, fontWeight:700, color:"#e8e0d0", fontFamily:"'Space Mono',monospace" },
+      segmentWrap:{ display:"flex", flexWrap:"wrap", gap:4 },
+      segBtn:{ padding:"6px 11px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:4, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:9, letterSpacing:"0.1em", cursor:"pointer" },
+      segActive:{ background:"#e2c87b18", borderColor:"#e2c87b66", color:"#e2c87b" },
+      confGrid:{ display:"flex", flexWrap:"wrap", gap:5 },
+      confBtn:{ padding:"4px 9px", border:"1px solid #2a2a32", borderRadius:3, background:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer" },
+      confActive:{ borderColor:"#60a5fa66", background:"#60a5fa18", color:"#60a5fa" },
+      confActive2:{ padding:"3px 9px", border:"1px solid #60a5fa55", borderRadius:3, background:"#60a5fa18", color:"#60a5fa", fontFamily:"'Space Mono',monospace", fontSize:9 },
+      formActions:{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:22, paddingTop:18, borderTop:"1px solid #1e1e24" },
+      cancelBtn:{ padding:"9px 18px", background:"none", border:"1px solid #2a2a32", borderRadius:4, color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", letterSpacing:"0.08em" },
+      saveBtn:{ padding:"9px 24px", background:"#e2c87b", border:"none", borderRadius:4, color:"#0a0a0c", fontFamily:"'Space Mono',monospace", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em" },
+      detailContainer:{ maxWidth:680, margin:"0 auto" },
+      backBtn:{ background:"none", border:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", marginBottom:18, letterSpacing:"0.1em" },
+      detailHeader:{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:10 },
+      bigPnL:{ fontSize:26, fontWeight:800, fontFamily:"'Space Mono',monospace" },
+      detailGrid:{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(120px, 1fr))", gap:8, marginBottom:20 },
+      detailStat:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:"9px 11px" },
+      detailStatLabel:{ fontSize:8, color:"#444", letterSpacing:"0.15em", marginBottom:3, fontFamily:"'Space Mono',monospace" },
+      detailStatVal:{ fontSize:13, color:"#e8e0d0", fontFamily:"'Space Mono',monospace" },
+      detailSection:{ marginBottom:18 },
+      sectionLabel:{ fontSize:8, letterSpacing:"0.2em", color:"#555", marginBottom:9, fontFamily:"'Space Mono',monospace" },
+      notesBox:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:12, fontSize:12, color:"#999", lineHeight:1.6, fontFamily:"'Space Mono',monospace" },
+      screenshotLink:{ color:"#60a5fa", fontFamily:"'Space Mono',monospace", fontSize:11, textDecoration:"none" },
+      detailActions:{ display:"flex", gap:10, marginTop:26, paddingTop:18, borderTop:"1px solid #1e1e24" },
+      editBtn:{ padding:"8px 18px", background:"#e2c87b22", border:"1px solid #e2c87b55", color:"#e2c87b", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
+      deleteBtn:{ padding:"8px 18px", background:"#f8717118", border:"1px solid #f8717144", color:"#f87171", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
+      statsContainer:{ maxWidth:680, margin:"0 auto" },
+      statsTitle:{ fontSize:15, fontWeight:800, letterSpacing:"0.1em", marginBottom:20, color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
+      statsGrid:{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:9, marginBottom:24 },
+      statCard:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:8, padding:"14px 12px", textAlign:"center" },
+      statLabel:{ fontSize:8, color:"#555", letterSpacing:"0.15em", marginBottom:7, fontFamily:"'Space Mono',monospace" },
+      statVal:{ fontSize:20, fontWeight:700, fontFamily:"'Space Mono',monospace" },
+      equityBox:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:"12px 14px" },
+      equityMeta:{ display:"flex", justifyContent:"space-between", marginTop:6 },
+      equityStart:{ fontSize:10, color:"#555", fontFamily:"'Space Mono',monospace" },
+      equityEnd:{ fontSize:10, fontFamily:"'Space Mono',monospace", fontWeight:700 },
+      setupRow:{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #1a1a1f", flexWrap:"wrap" },
+      setupName:{ fontSize:11, color:"#ccc", flex:1, minWidth:90, fontFamily:"'Space Mono',monospace" },
+      setupCount:{ fontSize:9, color:"#555", fontFamily:"'Space Mono',monospace" },
+      setupWR:{ fontSize:9, color:"#a78bfa", fontFamily:"'Space Mono',monospace" },
+      setupPnL:{ fontSize:11, fontWeight:700, fontFamily:"'Space Mono',monospace", minWidth:80, textAlign:"right" },
+      exportBtn:{ padding:"8px 18px", background:"none", border:"1px solid #2a2a32", color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
+      modalOverlay:{ position:"fixed", inset:0, background:"#000000bb", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 },
+      modal:{ background:"#111115", border:"1px solid #2a2a32", borderRadius:10, padding:24, width:"100%", maxWidth:380 },
+      modalTitle:{ fontSize:13, fontWeight:800, letterSpacing:"0.12em", color:"#e2c87b", fontFamily:"'Space Mono',monospace", marginBottom:20 },
+      riskRow:{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" },
+      riskPill:{ padding:"5px 10px", border:"1px solid #2a2a32", borderRadius:4, background:"none", color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer" },
+      riskPillActive:{ borderColor:"#f87171", color:"#f87171", background:"#f8717118" },
+      riskPreview:{ fontSize:11, color:"#888", fontFamily:"'Space Mono',monospace", marginTop:8, marginBottom:4 },
+      currencyBtn:{ padding:"7px 14px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:4, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:700, cursor:"pointer" },
+      currencyActive:{ background:"#e2c87b22", borderColor:"#e2c87b", color:"#e2c87b" },
+      inputPrefix:{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#888", fontFamily:"'Space Mono',monospace", fontSize:13, pointerEvents:"none" },
+      warnBanner:{ background:"#f8717118", border:"1px solid #f8717155", borderRadius:5, padding:"8px 12px", fontSize:10, color:"#f87171", fontFamily:"'Space Mono',monospace", marginBottom:12, lineHeight:1.6 },
+      fab:{ position:"fixed", bottom:28, right:24, width:52, height:52, borderRadius:"50%", background:"#e2c87b", border:"none", color:"#0a0a0c", fontSize:28, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 20px #e2c87b44", zIndex:50 },
+      toast:{ position:"fixed", bottom:22, left:"50%", transform:"translateX(-50%)", background:"#1e1e28", border:"1px solid #e2c87b55", color:"#e2c87b", padding:"9px 22px", borderRadius:20, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.1em", zIndex:200, whiteSpace:"nowrap" },
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
