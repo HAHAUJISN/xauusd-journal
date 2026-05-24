@@ -1,787 +1,825 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XAU/USD Journal</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: #0a0a0c; min-height: 100vh; }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #111; }
-    ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-    select option { background: #1a1a1f; }
-    input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>XAU/USD Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0a0a0c;min-height:100vh;font-family:'Syne',sans-serif;color:#e8e0d0}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+input,select,textarea,button{font-family:'Syne',sans-serif}
+input[type=number]::-webkit-inner-spin-button{opacity:.3}
+select option{background:#1a1a1f}
+.mono{font-family:'Space Mono',monospace}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #1e1e24;background:#0d0d10;flex-wrap:wrap;gap:10px}
+.h-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:26px;color:#e2c87b}
+.app-title{font-size:18px;font-weight:800;letter-spacing:.04em}
+.app-sub{font-size:9px;letter-spacing:.2em;color:#555}
+.h-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bal-box,.risk-box{display:flex;flex-direction:column;align-items:flex-end;padding:4px 10px;background:#141418;border:1px solid #2a2a32;border-radius:6px}
+.risk-box{border-color:#f8717133}
+.bal-lbl{font-size:8px;letter-spacing:.15em;color:#666}
+.bal-val{font-size:14px;font-weight:700}
+.risk-lbl{font-size:8px;letter-spacing:.15em;color:#f87171}
+.risk-val{font-size:11px;color:#f87171}
+.spot-box{display:flex;align-items:center;gap:6px;background:#141418;border:1px solid #2a2a32;border-radius:6px;padding:6px 10px}
+.spot-lbl{font-size:9px;letter-spacing:.15em;color:#e2c87b}
+.spot-inp{background:none;border:none;outline:none;color:#e8e0d0;font-size:13px;width:80px}
+.settings-btn{background:#141418;border:1px solid #2a2a32;color:#888;font-size:16px;padding:6px 10px;border-radius:6px;cursor:pointer}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;margin-left:4px;vertical-align:middle;transition:background .3s}
+.sync-dot.syncing{background:#e2c87b;animation:pulse 1s infinite}
+.sync-dot.ok{background:#4ade80}
+.sync-dot.err{background:#f87171}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid #1e1e24;background:#0d0d10}
+.nav-btn{padding:11px 18px;background:none;border:none;color:#555;font-size:10px;letter-spacing:.15em;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.nav-btn.active{color:#e2c87b;border-bottom-color:#e2c87b}
+main{max-width:900px;margin:0 auto;padding:20px 16px}
+.view{display:none}.view.active{display:block}
+.filter-row{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.filter-grp{display:flex;align-items:center;gap:5px}
+.filter-lbl{font-size:9px;letter-spacing:.15em;color:#555}
+.pill{padding:3px 9px;border:1px solid #2a2a32;border-radius:20px;background:none;color:#555;font-size:9px;letter-spacing:.1em;cursor:pointer}
+.pill.active{border-color:#e2c87b;color:#e2c87b;background:#e2c87b11}
+.trade-count{font-size:10px;color:#444}
+.log-btn{margin-left:auto;padding:5px 14px;background:#e2c87b;border:none;border-radius:4px;color:#0a0a0c;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.08em;white-space:nowrap}
+.trade-list{display:flex;flex-direction:column;gap:9px}
+.trade-card{background:#111115;border:1px solid #1e1e28;border-radius:8px;padding:12px 14px;cursor:pointer}
+.trade-card.win{border-left:3px solid #4ade8055}
+.trade-card.loss{border-left:3px solid #f8717155}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.card-left,.card-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.mode-badge{font-size:8px;letter-spacing:.12em;padding:2px 6px;border-radius:3px}
+.mode-live{background:#4ade8018;color:#4ade80;border:1px solid #4ade8040}
+.mode-bt{background:#e2c87b18;color:#e2c87b;border:1px solid #e2c87b40}
+.dir-badge{font-size:9px;padding:2px 7px;border-radius:3px}
+.dir-long{background:#4ade8018;color:#4ade80;border:1px solid #4ade8040}
+.dir-short{background:#f8717118;color:#f87171;border:1px solid #f8717140}
+.sess-tag{font-size:9px;color:#555}
+.setup-tag{font-size:9px;color:#60a5fa;background:#60a5fa15;padding:2px 7px;border-radius:3px;border:1px solid #60a5fa30}
+.pnl-tag{font-size:13px;font-weight:700}
+.open-tag{font-size:8px;color:#e2c87b;border:1px solid #e2c87b55;padding:2px 6px;border-radius:3px}
+.card-mid{margin-bottom:5px}
+.price-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.plbl{font-size:8px;color:#444;letter-spacing:.1em}
+.pval{font-size:11px;color:#bbb}
+.pval-sl{color:#f87171}.pval-tp{color:#4ade80}
+.rr-tag{font-size:9px;color:#a78bfa;background:#a78bfa18;padding:1px 6px;border-radius:3px;border:1px solid #a78bfa40}
+.card-bot{display:flex;justify-content:space-between}
+.date-txt,.lot-txt{font-size:9px;color:#444}
+.empty{text-align:center;padding:70px 20px;color:#555}
+.empty-icon{font-size:44px;color:#2a2a32;margin-bottom:14px}
+.cta-btn{margin-top:16px;padding:9px 22px;background:#e2c87b22;border:1px solid #e2c87b55;color:#e2c87b;font-size:10px;letter-spacing:.1em;border-radius:4px;cursor:pointer}
+.form-wrap{max-width:680px;margin:0 auto}
+.form-title{font-size:15px;font-weight:800;letter-spacing:.1em;margin-bottom:18px;color:#e2c87b}
+.risk-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#f8717110;border:1px solid #f8717133;border-radius:6px;margin-bottom:18px;flex-wrap:wrap}
+.risk-banner-lbl{font-size:8px;letter-spacing:.18em;color:#f87171}
+.risk-banner-val{font-size:12px;color:#f87171;flex:1}
+.risk-edit-btn{font-size:9px;color:#666;background:none;border:1px solid #333;padding:2px 8px;border-radius:3px;cursor:pointer}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:4px}
+.field{margin-bottom:14px}
+.field-label{font-size:8px;letter-spacing:.2em;color:#555;margin-bottom:5px}
+input[type=text],input[type=number],input[type=date],input[type=time],input[type=url],select,textarea{width:100%;background:#111115;border:1px solid #2a2a32;border-radius:5px;padding:8px 11px;color:#e8e0d0;font-size:12px;outline:none}
+textarea{resize:vertical;height:80px}
+input.sl-inp{border-color:#f8717166}
+input.tp-inp{border-color:#4ade8066}
+input.lot-inp{color:#a78bfa}
+.status-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.status-btn{flex:1;min-width:70px;padding:10px 8px;background:#0d0d10;border:1px solid #2a2a32;border-radius:5px;color:#555;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.05em}
+.status-btn.s-open{background:#e2c87b18;border-color:#e2c87b66;color:#e2c87b}
+.status-btn.s-win{background:#4ade8022;border-color:#4ade8066;color:#4ade80}
+.status-btn.s-loss{background:#f8717122;border-color:#f8717166;color:#f87171}
+.status-btn.s-be{background:#60a5fa18;border-color:#60a5fa55;color:#60a5fa}
+.auto-hint{font-size:10px;color:#888;margin-top:6px;padding-left:4px}
+.seg-wrap{display:flex;flex-wrap:wrap;gap:4px}
+.seg-btn{padding:6px 11px;background:#0d0d10;border:1px solid #2a2a32;border-radius:4px;color:#555;font-size:9px;letter-spacing:.1em;cursor:pointer}
+.seg-btn.active{background:#e2c87b18;border-color:#e2c87b66;color:#e2c87b}
+.seg-btn.active-long{background:#4ade8022;border-color:#4ade8066;color:#4ade80}
+.seg-btn.active-short{background:#f8717122;border-color:#f8717166;color:#f87171}
+.auto-strip{display:flex;flex-wrap:wrap;gap:10px;padding:10px 14px;background:#a78bfa0a;border:1px solid #a78bfa22;border-radius:6px;margin-bottom:14px}
+.auto-strip.pnl-win{background:#4ade8012;border-color:#4ade8044}
+.auto-strip.pnl-loss{background:#f8717112;border-color:#f8717144}
+.chip{display:flex;flex-direction:column;gap:2px}
+.chip-lbl{font-size:7px;letter-spacing:.18em;color:#666}
+.chip-val{font-size:14px;font-weight:700;color:#e8e0d0}
+.chip-val.purple{color:#a78bfa}.chip-val.red{color:#f87171}.chip-val.green{color:#4ade80}.chip-val.muted{font-size:12px;color:#888}.chip-val.big{font-size:18px}
+.conf-grid{display:flex;flex-wrap:wrap;gap:5px}
+.conf-btn{padding:4px 9px;border:1px solid #2a2a32;border-radius:3px;background:none;color:#555;font-size:9px;cursor:pointer}
+.conf-btn.active{border-color:#60a5fa66;background:#60a5fa18;color:#60a5fa}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid #1e1e24}
+.cancel-btn{padding:9px 18px;background:none;border:1px solid #2a2a32;border-radius:4px;color:#666;font-size:10px;cursor:pointer;letter-spacing:.08em}
+.save-btn{padding:9px 24px;background:#e2c87b;border:none;border-radius:4px;color:#0a0a0c;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.08em}
+.warn{background:#f8717118;border:1px solid #f8717155;border-radius:5px;padding:8px 12px;font-size:10px;color:#f87171;margin-bottom:12px;line-height:1.6}
+.detail-wrap{max-width:680px;margin:0 auto}
+.back-btn{background:none;border:none;color:#555;font-size:10px;cursor:pointer;margin-bottom:18px;letter-spacing:.1em}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.detail-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.big-pnl{font-size:26px;font-weight:800}
+.r-result{font-size:13px;color:#a78bfa}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:20px}
+.dstat{background:#111115;border:1px solid #1e1e28;border-radius:6px;padding:9px 11px}
+.dstat-lbl{font-size:8px;color:#444;letter-spacing:.15em;margin-bottom:3px}
+.dstat-val{font-size:13px;color:#e8e0d0}
+.section{margin-bottom:18px}
+.sec-lbl{font-size:8px;letter-spacing:.2em;color:#555;margin-bottom:9px}
+.notes-box{background:#111115;border:1px solid #1e1e28;border-radius:6px;padding:12px;font-size:12px;color:#999;line-height:1.6}
+.ss-link{color:#60a5fa;font-size:11px;text-decoration:none}
+.conf-tag{padding:3px 9px;border:1px solid #60a5fa55;border-radius:3px;background:#60a5fa18;color:#60a5fa;font-size:9px}
+.detail-actions{display:flex;gap:10px;margin-top:26px;padding-top:18px;border-top:1px solid #1e1e24}
+.edit-btn{padding:8px 18px;background:#e2c87b22;border:1px solid #e2c87b55;color:#e2c87b;font-size:10px;cursor:pointer;border-radius:4px}
+.del-btn{padding:8px 18px;background:#f8717118;border:1px solid #f8717144;color:#f87171;font-size:10px;cursor:pointer;border-radius:4px}
+.stats-wrap{max-width:680px;margin:0 auto}
+.stats-title{font-size:15px;font-weight:800;letter-spacing:.1em;margin-bottom:20px;color:#e2c87b}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;margin-bottom:24px}
+.stat-card{background:#111115;border:1px solid #1e1e28;border-radius:8px;padding:14px 12px;text-align:center}
+.stat-lbl{font-size:8px;color:#555;letter-spacing:.15em;margin-bottom:7px}
+.stat-val{font-size:20px;font-weight:700}
+.equity-box{background:#111115;border:1px solid #1e1e28;border-radius:6px;padding:12px 14px}
+.equity-meta{display:flex;justify-content:space-between;margin-top:6px}
+.eq-start{font-size:10px;color:#555}
+.eq-end{font-size:10px;font-weight:700}
+.setup-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a1f;flex-wrap:wrap}
+.setup-name{font-size:11px;color:#ccc;flex:1;min-width:90px}
+.setup-cnt{font-size:9px;color:#555}
+.setup-wr{font-size:9px;color:#a78bfa}
+.setup-pnl{font-size:11px;font-weight:700;min-width:80px;text-align:right}
+.export-btn{padding:8px 18px;background:none;border:1px solid #2a2a32;color:#666;font-size:10px;cursor:pointer;border-radius:4px}
+.modal-overlay{display:none;position:fixed;inset:0;background:#000000bb;z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:#111115;border:1px solid #2a2a32;border-radius:10px;padding:24px;width:100%;max-width:380px}
+.modal-title{font-size:13px;font-weight:800;letter-spacing:.12em;color:#e2c87b;margin-bottom:20px}
+.curr-row,.risk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.curr-btn{padding:7px 14px;background:#0d0d10;border:1px solid #2a2a32;border-radius:4px;color:#555;font-size:11px;font-weight:700;cursor:pointer}
+.curr-btn.active{background:#e2c87b22;border-color:#e2c87b;color:#e2c87b}
+.risk-pill{padding:5px 10px;border:1px solid #2a2a32;border-radius:4px;background:none;color:#666;font-size:10px;cursor:pointer}
+.risk-pill.active{border-color:#f87171;color:#f87171;background:#f8717118}
+.risk-preview{font-size:11px;color:#888;margin-top:8px;margin-bottom:4px}
+.inp-wrap{position:relative}
+.inp-prefix{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#888;font-size:13px;pointer-events:none}
+.inp-prefix+input{padding-left:24px}
+.fab{position:fixed;bottom:28px;right:24px;width:52px;height:52px;border-radius:50%;background:#e2c87b;border:none;color:#0a0a0c;font-size:28px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px #e2c87b44;z-index:50;display:flex;align-items:center;justify-content:center}
+.toast{display:none;position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1e1e28;border:1px solid #e2c87b55;color:#e2c87b;padding:9px 22px;border-radius:20px;font-size:10px;letter-spacing:.1em;z-index:200;white-space:nowrap}
+.toast.show{display:block}
+.loading{text-align:center;padding:40px;color:#555;font-size:12px}
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect } = React;
 
-    const STORAGE_KEY = "xauusd-journal-trades-v2";
-    const ACCOUNT_KEY = "xauusd-journal-account";
-    const DEFAULT_ACCOUNT = { balance: 10000, riskPercent: 1, currency: 'USD' };
-    const CURRENCY_SYMBOLS = { USD: '$', GBP: '£', EUR: '€' };
+<header>
+  <div class="h-left">
+    <span class="logo">⬡</span>
+    <div>
+      <div class="app-title">XAU/USD Journal</div>
+      <div class="app-sub mono">Trade Intelligence System</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <div class="bal-box">
+      <span class="bal-lbl mono">BALANCE</span>
+      <span class="bal-val mono" id="hdr-bal">$10,000</span>
+    </div>
+    <div class="risk-box">
+      <span class="risk-lbl mono">RISK/TRADE</span>
+      <span class="risk-val mono" id="hdr-risk">$100 (1%)</span>
+    </div>
+    <div class="spot-box">
+      <span class="spot-lbl mono">SPOT</span>
+      <input class="spot-inp mono" id="spot-inp" placeholder="price">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="sync-dot mono" id="sync-dot" title="Sync status"></span>
+      <button class="settings-btn" onclick="openSettings()">⚙</button>
+    </div>
+  </div>
+</header>
 
-    const initialForm = {
-      mode: "backtest", date: "", time: "", session: "London", direction: "Long",
-      entryPrice: "", stopLoss: "", takeProfit: "", lotSize: "", exitPrice: "",
-      exitTime: "", status: "Open", setup: "", confluences: [], rr: "",
-      pnlDollars: "", riskDollars: "", notes: "", screenshot: "", emotion: "Neutral",
-    };
+<nav>
+  <button class="nav-btn mono active" onclick="showView('journal',this)">JOURNAL</button>
+  <button class="nav-btn mono" onclick="showView('add',this);newTrade()">NEW TRADE</button>
+  <button class="nav-btn mono" onclick="showView('stats',this);renderStats()">ANALYTICS</button>
+</nav>
 
-    const CONFLUENCE_OPTIONS = [
-      "HTF Trend","BOS/CHoCH","Order Block","FVG","Liquidity Sweep",
-      "PDH/PDL","EMA Cross","Volume Spike","News Catalyst","Session Open",
-      "Support/Resistance","Golden Ratio","VWAP","Fibonacci",
-    ];
-    const SESSION_OPTS = ["Sydney","Tokyo","London","New York","London/NY Overlap"];
-    const EMOTION_OPTS = ["Disciplined","Confident","Neutral","Anxious","FOMO","Revenge"];
-    const SETUP_OPTS = ["ICT Breaker","OTE Retracement","Liquidity Grab","Market Structure Shift","Range Break","News Trade","Other"];
+<main>
+  <div id="view-journal" class="view active">
+    <div class="filter-row">
+      <div class="filter-grp">
+        <span class="filter-lbl mono">MODE</span>
+        <button class="pill mono active" onclick="setFilter('mode','All',this)">ALL</button>
+        <button class="pill mono" onclick="setFilter('mode','backtest',this)">BACKTEST</button>
+        <button class="pill mono" onclick="setFilter('mode','live',this)">LIVE</button>
+      </div>
+      <div class="filter-grp">
+        <span class="filter-lbl mono">DIR</span>
+        <button class="pill mono active" onclick="setFilter('dir','All',this)">ALL</button>
+        <button class="pill mono" onclick="setFilter('dir','Long',this)">LONG</button>
+        <button class="pill mono" onclick="setFilter('dir','Short',this)">SHORT</button>
+      </div>
+      <span class="trade-count mono" id="trade-count">0 TRADES</span>
+      <button class="log-btn mono" onclick="showView('add',null);newTrade()">+ LOG TRADE</button>
+    </div>
+    <div id="trade-list"><div class="loading mono">Loading trades...</div></div>
+  </div>
 
-    function calcPnL(direction, entry, exit, lots) {
-      const e = parseFloat(entry), x = parseFloat(exit), l = parseFloat(lots);
-      if (!e || !x || !l) return "";
-      const diff = direction === "Long" ? (x - e) : (e - x);
-      return (diff * l * 100).toFixed(2);
-    }
-    function calcRR(entry, sl, tp) {
-      const e = parseFloat(entry), s = parseFloat(sl), t = parseFloat(tp);
-      if (!e || !s || !t) return "";
-      const risk = Math.abs(e - s), reward = Math.abs(t - e);
-      if (risk === 0) return "";
-      return (reward / risk).toFixed(2);
-    }
-    function calcLotSize(entry, sl, riskDollars) {
-      const e = parseFloat(entry), s = parseFloat(sl), r = parseFloat(riskDollars);
-      if (!e || !s || !r) return "";
-      const slMove = Math.abs(e - s);
-      if (slMove < 0.01) return "";
-      const pips = slMove / 0.01;
-      const lots = r / pips;
-      if (lots > 100) return "100.00";
-      if (lots < 0.01) return "0.01";
-      return lots.toFixed(2);
-    }
-    function detectSessionPrecise(gmtTime) {
-      if (!gmtTime) return "London";
-      const [h, m] = gmtTime.split(":").map(Number);
-      const mins = h * 60 + m;
-      if (mins >= 12*60 && mins < 16*60) return "London/NY Overlap";
-      if (mins >= 7*60  && mins < 12*60) return "London";
-      if (mins >= 16*60 && mins < 21*60) return "New York";
-      if (mins >= 0     && mins < 6*60)  return "Tokyo";
-      return "Sydney";
-    }
-
-    function App() {
-      const [trades, setTrades] = useState([]);
-      const [account, setAccount] = useState(DEFAULT_ACCOUNT);
-      const [form, setForm] = useState({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5) });
-      const [view, setView] = useState("journal");
-      const [selected, setSelected] = useState(null);
-      const [filterMode, setFilterMode] = useState("All");
-      const [filterDir, setFilterDir] = useState("All");
-      const [spotPrice, setSpotPrice] = useState("");
-      const [editId, setEditId] = useState(null);
-      const [toast, setToast] = useState("");
-      const [showSettings, setShowSettings] = useState(false);
-      const [settingsForm, setSettingsForm] = useState(DEFAULT_ACCOUNT);
-
-      useEffect(() => {
-        try {
-          const saved = localStorage.getItem(STORAGE_KEY);
-          if (saved) setTrades(JSON.parse(saved));
-          const acc = localStorage.getItem(ACCOUNT_KEY);
-          if (acc) { const a = JSON.parse(acc); setAccount(a); setSettingsForm(a); }
-        } catch {}
-      }, []);
-      useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trades)); } catch {} }, [trades]);
-      useEffect(() => { try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch {} }, [account]);
-
-      function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2800); }
-
-      function goToAdd() {
-        const riskAmt = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
-        setForm({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5), riskDollars: riskAmt });
-        setEditId(null);
-        setView("add");
-      }
-
-      function handleFormChange(key, val) {
-        setForm(f => {
-          let u = { ...f, [key]: val };
-          const riskAmt = parseFloat(account.balance) * parseFloat(account.riskPercent) / 100;
-          u.riskDollars = riskAmt.toFixed(2);
-          if (key === "time") u.session = detectSessionPrecise(u.time);
-          if (u.entryPrice && u.stopLoss) {
-            const autoLots = calcLotSize(u.entryPrice, u.stopLoss, riskAmt);
-            if (autoLots) u.lotSize = autoLots;
-          }
-          u.rr = calcRR(u.entryPrice, u.stopLoss, u.takeProfit);
-          if (key === "status") {
-            if (val === "Win")       u.exitPrice = u.takeProfit || u.exitPrice;
-            if (val === "Loss")      u.exitPrice = u.stopLoss   || u.exitPrice;
-            if (val === "Breakeven") u.exitPrice = u.entryPrice || u.exitPrice;
-            if (val === "Open")      u.exitPrice = "";
-          }
-          u.pnlDollars = (u.exitPrice && u.status !== "Open")
-            ? calcPnL(u.direction, u.entryPrice, u.exitPrice, u.lotSize) : "";
-          return u;
-        });
-      }
-
-      function applyAccountToForm(newAcc) {
-        setForm(f => {
-          const riskAmt = parseFloat(newAcc.balance) * parseFloat(newAcc.riskPercent) / 100;
-          const u = { ...f, riskDollars: riskAmt.toFixed(2) };
-          if (u.entryPrice && u.stopLoss) { const l = calcLotSize(u.entryPrice, u.stopLoss, riskAmt); if (l) u.lotSize = l; }
-          if (u.exitPrice && u.status !== "Open") u.pnlDollars = calcPnL(u.direction, u.entryPrice, u.exitPrice, u.lotSize);
-          if (u.time) u.session = detectSessionPrecise(u.time);
-          return u;
-        });
-      }
-
-      function toggleConfluence(c) {
-        setForm(f => ({ ...f, confluences: f.confluences.includes(c) ? f.confluences.filter(x => x !== c) : [...f.confluences, c] }));
-      }
-
-      function saveTrade() {
-        if (!form.entryPrice || !form.date) { showToast("Entry price and date required"); return; }
-        if (editId !== null) {
-          setTrades(t => t.map(tr => tr.id === editId ? { ...form, id: editId } : tr));
-          showToast("Trade updated ✓");
-        } else {
-          setTrades(t => [{ ...form, id: Date.now(), currency: account.currency || 'USD' }, ...t]);
-          showToast("Trade saved ✓");
-        }
-        const riskAmt = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
-        setForm({ ...initialForm, date: new Date().toISOString().split("T")[0], time: new Date().toTimeString().slice(0,5), riskDollars: riskAmt });
-        setEditId(null); setView("journal");
-      }
-
-      function deleteTrade(id) { setTrades(t => t.filter(tr => tr.id !== id)); setSelected(null); setView("journal"); showToast("Trade deleted"); }
-      function editTrade(trade) { setForm({ ...trade }); setEditId(trade.id); setView("add"); }
-
-      const sym = CURRENCY_SYMBOLS[account.currency || 'USD'];
-      const filtered = trades.filter(t => (filterMode === "All" || t.mode === filterMode) && (filterDir === "All" || t.direction === filterDir));
-      const closedTrades = trades.filter(t => t.status !== "Open" && t.pnlDollars !== "");
-      const totalPnL = closedTrades.reduce((s, t) => s + parseFloat(t.pnlDollars || 0), 0);
-      const wins = closedTrades.filter(t => parseFloat(t.pnlDollars) > 0).length;
-      const losses = closedTrades.filter(t => parseFloat(t.pnlDollars) < 0).length;
-      const winRate = closedTrades.length ? ((wins / closedTrades.length) * 100).toFixed(1) : "—";
-      const avgRR = closedTrades.filter(t => t.rr).length
-        ? (closedTrades.reduce((s, t) => s + parseFloat(t.rr || 0), 0) / closedTrades.filter(t => t.rr).length).toFixed(2) : "—";
-      const riskPerTrade = (parseFloat(account.balance) * parseFloat(account.riskPercent) / 100).toFixed(2);
-      const currentBalance = (parseFloat(account.balance) + totalPnL).toFixed(2);
-
-      const S = styles;
-
-      return (
-        <div style={S.root}>
-          {/* HEADER */}
-          <header style={S.header}>
-            <div style={S.headerLeft}>
-              <span style={S.logo}>⬡</span>
-              <div>
-                <div style={S.title}>XAU/USD Journal</div>
-                <div style={S.subtitle}>Trade Intelligence System</div>
-              </div>
-            </div>
-            <div style={S.headerRight}>
-              <div style={S.balanceBox}>
-                <span style={S.balLabel}>BALANCE</span>
-                <span style={{ ...S.balVal, color: totalPnL >= 0 ? "#4ade80" : "#f87171" }}>
-                  {sym}{parseFloat(currentBalance).toLocaleString()}
-                </span>
-              </div>
-              <div style={S.riskBadge}>
-                <span style={S.riskLabel}>RISK/TRADE</span>
-                <span style={S.riskVal}>{sym}{riskPerTrade} ({account.riskPercent}%)</span>
-              </div>
-              <div style={S.spotBox}>
-                <span style={S.spotLabel}>SPOT</span>
-                <input style={S.spotInput} value={spotPrice} onChange={e => setSpotPrice(e.target.value)} placeholder="price" />
-              </div>
-              <button style={S.settingsBtn} onClick={() => { setSettingsForm({...account}); setShowSettings(true); }}>⚙</button>
-            </div>
-          </header>
-
-          {/* NAV */}
-          <nav style={S.nav}>
-            {[["journal","JOURNAL"],["add","NEW TRADE"],["stats","ANALYTICS"]].map(([v,label]) => (
-              <button key={v} style={{ ...S.navBtn, ...(view === v ? S.navActive : {}) }}
-                onClick={() => { if (v === "add" && view !== "add") goToAdd(); else setView(v); }}>
-                {label}
-              </button>
-            ))}
-          </nav>
-
-          <main style={S.main}>
-
-            {/* ── JOURNAL ── */}
-            {view === "journal" && (
-              <div>
-                <div style={S.filterRow}>
-                  <div style={S.filterGroup}>
-                    <span style={S.filterLabel}>MODE</span>
-                    {["All","backtest","live"].map(m => (
-                      <button key={m} style={{ ...S.pill, ...(filterMode === m ? S.pillActive : {}) }}
-                        onClick={() => setFilterMode(m)}>{m.toUpperCase()}</button>
-                    ))}
-                  </div>
-                  <div style={S.filterGroup}>
-                    <span style={S.filterLabel}>DIR</span>
-                    {["All","Long","Short"].map(d => (
-                      <button key={d} style={{ ...S.pill, ...(filterDir === d ? S.pillActive : {}) }}
-                        onClick={() => setFilterDir(d)}>{d.toUpperCase()}</button>
-                    ))}
-                  </div>
-                  <span style={S.tradeCount}>{filtered.length} TRADES</span>
-                  <button style={S.logBtn} onClick={goToAdd}>+ LOG TRADE</button>
-                </div>
-
-                {filtered.length === 0 ? (
-                  <div style={S.empty}>
-                    <div style={S.emptyIcon}>◈</div>
-                    <div style={{ marginBottom:8 }}>No trades yet</div>
-                    <button style={S.ctaBtn} onClick={goToAdd}>Log First Trade</button>
-                  </div>
-                ) : (
-                  <div style={S.tradeList}>
-                    {filtered.map(trade => {
-                      const pnl = parseFloat(trade.pnlDollars || 0);
-                      const isWin = pnl > 0, isLoss = pnl < 0;
-                      const tSym = CURRENCY_SYMBOLS[trade.currency || account.currency || 'USD'];
-                      return (
-                        <div key={trade.id}
-                          style={{ ...S.tradeCard, ...(isWin ? S.cardWin : isLoss ? S.cardLoss : {}) }}
-                          onClick={() => { setSelected(trade); setView("detail"); }}>
-                          <div style={S.cardTop}>
-                            <div style={S.cardLeft}>
-                              <span style={{ ...S.modeBadge, ...(trade.mode === "live" ? S.modeLive : S.modeBacktest) }}>
-                                {trade.mode === "live" ? "● LIVE" : "◆ BT"}
-                              </span>
-                              <span style={{ ...S.dirBadge, ...(trade.direction === "Long" ? S.longBadge : S.shortBadge) }}>
-                                {trade.direction === "Long" ? "▲" : "▼"} {trade.direction.toUpperCase()}
-                              </span>
-                              <span style={S.cardSession}>{trade.session}</span>
-                              {trade.setup && <span style={S.setupTagSmall}>{trade.setup}</span>}
-                            </div>
-                            <div style={S.cardRight}>
-                              {trade.pnlDollars !== "" && (
-                                <span style={{ ...S.pnlTag, color: isWin ? "#4ade80" : isLoss ? "#f87171" : "#aaa" }}>
-                                  {isWin ? "+" : ""}{trade.pnlDollars} {trade.currency||'USD'}
-                                </span>
-                              )}
-                              {trade.status === "Open" && <span style={S.openTag}>OPEN</span>}
-                            </div>
-                          </div>
-                          <div style={S.cardMid}>
-                            <div style={S.priceRow}>
-                              <span style={S.priceLabel}>ENTRY</span><span style={S.priceVal}>{trade.entryPrice}</span>
-                              {trade.stopLoss && <><span style={S.priceLabel}>SL</span><span style={{ ...S.priceVal, color:"#f87171" }}>{trade.stopLoss}</span></>}
-                              {trade.takeProfit && <><span style={S.priceLabel}>TP</span><span style={{ ...S.priceVal, color:"#4ade80" }}>{trade.takeProfit}</span></>}
-                              {trade.exitPrice && trade.status !== "Open" && <><span style={S.priceLabel}>EXIT</span><span style={S.priceVal}>{trade.exitPrice}</span></>}
-                              {trade.rr && <span style={S.rrTag}>1:{trade.rr}R</span>}
-                            </div>
-                          </div>
-                          <div style={S.cardBot}>
-                            <span style={S.dateText}>{trade.date}{trade.time && ` • ${trade.time}`}</span>
-                            <span style={S.lotText}>{trade.lotSize && `${trade.lotSize} lots`}{trade.riskDollars && ` • ${tSym}${trade.riskDollars} risk`}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── ADD / EDIT ── */}
-            {view === "add" && (
-              <div style={S.formContainer}>
-                <div style={S.formTitle}>{editId ? "EDIT TRADE" : "LOG TRADE"}</div>
-                <div style={S.riskBanner}>
-                  <span style={S.riskBannerLabel}>AUTO RISK</span>
-                  <span style={S.riskBannerVal}>
-                    {sym}{riskPerTrade} ({account.riskPercent}% of {sym}{parseFloat(account.balance).toLocaleString()})
-                    {form.lotSize && ` → ${form.lotSize} lots`}
-                  </span>
-                  <button style={S.riskEditBtn} onClick={() => { setSettingsForm({...account}); setShowSettings(true); }}>Edit</button>
-                </div>
-
-                <div style={S.formRow}>
-                  <FF label="MODE"><Seg options={["backtest","live"]} value={form.mode} onChange={v => handleFormChange("mode",v)} /></FF>
-                  <FF label="DIRECTION"><Seg options={["Long","Short"]} value={form.direction} onChange={v => handleFormChange("direction",v)} colors={{ Long:"#4ade80", Short:"#f87171" }} /></FF>
-                </div>
-
-                <FF label="OUTCOME">
-                  <div style={S.statusRow}>
-                    {["Open","Win","Loss","Breakeven"].map(s => (
-                      <button key={s}
-                        style={{ ...S.statusBtn, ...(form.status===s ? {Open:S.statusOpen,Win:S.statusWin,Loss:S.statusLoss,Breakeven:S.statusBE}[s] : {}) }}
-                        onClick={() => handleFormChange("status",s)}>
-                        {s==="Win"?"✓ WIN":s==="Loss"?"✗ LOSS":s==="Breakeven"?"≈ BE":"○ OPEN"}
-                      </button>
-                    ))}
-                  </div>
-                  {(form.status==="Win"||form.status==="Loss") && form.exitPrice && (
-                    <div style={S.autoFillHint}>↳ Exit auto-set to {form.status==="Win"?"TP":"SL"}: <strong>{form.exitPrice}</strong></div>
-                  )}
-                </FF>
-
-                <div style={S.formRow}>
-                  <FF label="DATE"><input style={S.input} type="date" value={form.date} onChange={e => handleFormChange("date",e.target.value)} /></FF>
-                  <FF label="ENTRY TIME (GMT)"><input style={S.input} type="time" value={form.time} onChange={e => handleFormChange("time",e.target.value)} /></FF>
-                  <FF label="SESSION (AUTO)">
-                    <select style={S.input} value={form.session} onChange={e => handleFormChange("session",e.target.value)}>
-                      {SESSION_OPTS.map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </FF>
-                </div>
-
-                <div style={S.formRow}>
-                  <FF label="ENTRY PRICE *"><input style={S.input} type="number" step="0.01" value={form.entryPrice} onChange={e => handleFormChange("entryPrice",e.target.value)} placeholder="2345.00" /></FF>
-                  <FF label="STOP LOSS"><input style={{ ...S.input, borderColor:"#f8717166" }} type="number" step="0.01" value={form.stopLoss} onChange={e => handleFormChange("stopLoss",e.target.value)} placeholder="2335.00" /></FF>
-                  <FF label="TAKE PROFIT"><input style={{ ...S.input, borderColor:"#4ade8066" }} type="number" step="0.01" value={form.takeProfit} onChange={e => handleFormChange("takeProfit",e.target.value)} placeholder="2365.00" /></FF>
-                </div>
-
-                {(form.rr || form.lotSize) && (
-                  <div style={S.autoStrip}>
-                    {form.lotSize && (
-                      <div style={S.autoChip}>
-                        <span style={S.chipLabel}>LOT SIZE (AUTO)</span>
-                        <span style={{ ...S.chipVal, color: parseFloat(form.lotSize)>10?"#f87171":"#e8e0d0" }}>{form.lotSize}{parseFloat(form.lotSize)>10?" ⚠":""}</span>
-                      </div>
-                    )}
-                    {form.rr && <div style={S.autoChip}><span style={S.chipLabel}>R:R</span><span style={{ ...S.chipVal, color:"#a78bfa" }}>1:{form.rr}</span></div>}
-                    {form.riskDollars && <div style={S.autoChip}><span style={S.chipLabel}>RISK</span><span style={{ ...S.chipVal, color:"#f87171" }}>{sym}{form.riskDollars}</span></div>}
-                    {form.entryPrice && form.stopLoss && (
-                      <div style={S.autoChip}>
-                        <span style={S.chipLabel}>SL PIPS</span>
-                        <span style={{ ...S.chipVal, fontSize:12, color:"#888" }}>{Math.round(Math.abs(parseFloat(form.entryPrice||0)-parseFloat(form.stopLoss||0))/0.01)} pips</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {form.lotSize && parseFloat(form.lotSize)>10 && <div style={S.warnBanner}>⚠ Lot size {form.lotSize} is very large — SL may be too tight.</div>}
-                {form.entryPrice && form.stopLoss && form.direction==="Long" && parseFloat(form.stopLoss)>parseFloat(form.entryPrice) && (
-                  <div style={S.warnBanner}>⚠ Long trade but SL is above entry — did you mean to enter TP there?</div>
-                )}
-                {form.entryPrice && form.stopLoss && form.direction==="Short" && parseFloat(form.stopLoss)<parseFloat(form.entryPrice) && (
-                  <div style={S.warnBanner}>⚠ Short trade but SL is below entry — did you mean to enter TP there?</div>
-                )}
-
-                <div style={S.formRow}>
-                  <FF label="LOT SIZE (AUTO)"><input style={{ ...S.input, color:"#a78bfa" }} type="number" step="0.01" value={form.lotSize} onChange={e => handleFormChange("lotSize",e.target.value)} placeholder="auto" /></FF>
-                  <FF label="EXIT PRICE (AUTO)"><input style={S.input} type="number" step="0.01" value={form.exitPrice} onChange={e => handleFormChange("exitPrice",e.target.value)} placeholder="auto on Win/Loss" /></FF>
-                  <FF label="EXIT TIME"><input style={S.input} type="time" value={form.exitTime} onChange={e => handleFormChange("exitTime",e.target.value)} /></FF>
-                </div>
-
-                {form.pnlDollars && (
-                  <div style={{ ...S.autoStrip, background:parseFloat(form.pnlDollars)>0?"#4ade8012":"#f8717112", borderColor:parseFloat(form.pnlDollars)>0?"#4ade8044":"#f8717144" }}>
-                    <div style={S.autoChip}>
-                      <span style={S.chipLabel}>P&L</span>
-                      <span style={{ ...S.chipVal, fontSize:18, color:parseFloat(form.pnlDollars)>0?"#4ade80":"#f87171" }}>
-                        {parseFloat(form.pnlDollars)>0?"+":""}{form.pnlDollars} {account.currency||'USD'}
-                      </span>
-                    </div>
-                    {form.rr && form.riskDollars && (
-                      <div style={S.autoChip}>
-                        <span style={S.chipLabel}>RESULT</span>
-                        <span style={{ ...S.chipVal, color:"#a78bfa" }}>{(parseFloat(form.pnlDollars)/parseFloat(form.riskDollars)).toFixed(2)}R</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <FF label="SETUP">
-                  <select style={S.input} value={form.setup} onChange={e => handleFormChange("setup",e.target.value)}>
-                    <option value="">— Select —</option>
-                    {SETUP_OPTS.map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </FF>
-
-                <FF label="CONFLUENCES">
-                  <div style={S.confGrid}>
-                    {CONFLUENCE_OPTIONS.map(c => (
-                      <button key={c} style={{ ...S.confBtn, ...(form.confluences.includes(c)?S.confActive:{}) }} onClick={() => toggleConfluence(c)}>{c}</button>
-                    ))}
-                  </div>
-                </FF>
-
-                <FF label="EMOTIONAL STATE">
-                  <div style={S.confGrid}>
-                    {EMOTION_OPTS.map(e => (
-                      <button key={e} style={{ ...S.confBtn, ...(form.emotion===e?S.confActive:{}) }} onClick={() => handleFormChange("emotion",e)}>{e}</button>
-                    ))}
-                  </div>
-                </FF>
-
-                <FF label="TRADE NOTES">
-                  <textarea style={{ ...S.input, height:80, resize:"vertical" }} value={form.notes}
-                    onChange={e => handleFormChange("notes",e.target.value)} placeholder="Setup reasoning, market context..." />
-                </FF>
-
-                <FF label="SCREENSHOT URL">
-                  <input style={S.input} type="url" value={form.screenshot}
-                    onChange={e => handleFormChange("screenshot",e.target.value)} placeholder="https://tradingview.com/x/..." />
-                </FF>
-
-                <div style={S.formActions}>
-                  <button style={S.cancelBtn} onClick={() => { setView("journal"); setEditId(null); }}>CANCEL</button>
-                  <button style={S.saveBtn} onClick={saveTrade}>{editId ? "UPDATE TRADE" : "SAVE TRADE"}</button>
-                </div>
-              </div>
-            )}
-
-            {/* ── DETAIL ── */}
-            {view === "detail" && selected && (() => {
-              const trade = trades.find(t => t.id === selected.id) || selected;
-              const pnl = parseFloat(trade.pnlDollars || 0);
-              const tSym = CURRENCY_SYMBOLS[trade.currency || account.currency || 'USD'];
-              const rResult = trade.riskDollars && trade.pnlDollars ? (pnl/parseFloat(trade.riskDollars)).toFixed(2) : null;
-              return (
-                <div style={S.detailContainer}>
-                  <button style={S.backBtn} onClick={() => setView("journal")}>← BACK</button>
-                  <div style={S.detailHeader}>
-                    <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-                      <span style={{ ...S.modeBadge, ...(trade.mode==="live"?S.modeLive:S.modeBacktest) }}>{trade.mode==="live"?"● LIVE":"◆ BACKTEST"}</span>
-                      <span style={{ ...S.dirBadge, ...(trade.direction==="Long"?S.longBadge:S.shortBadge) }}>{trade.direction==="Long"?"▲":"▼"} {trade.direction}</span>
-                      <span style={S.cardSession}>{trade.session}</span>
-                      {trade.setup && <span style={S.setupTagSmall}>{trade.setup}</span>}
-                    </div>
-                    <div style={{ textAlign:"right" }}>
-                      {trade.pnlDollars !== "" && <div style={{ ...S.bigPnL, color:pnl>0?"#4ade80":pnl<0?"#f87171":"#aaa" }}>{pnl>0?"+":""}{trade.pnlDollars} {trade.currency||'USD'}</div>}
-                      {rResult && <div style={{ fontSize:13, color:"#a78bfa", fontFamily:"'Space Mono',monospace" }}>{parseFloat(rResult)>0?"+":""}{rResult}R</div>}
-                    </div>
-                  </div>
-                  <div style={S.detailGrid}>
-                    {[["Date",trade.date],["Entry Time",trade.time],["Exit Time",trade.exitTime],
-                      ["Entry",trade.entryPrice],["Stop Loss",trade.stopLoss],["Take Profit",trade.takeProfit],
-                      ["Exit Price",trade.exitPrice],["Lot Size",trade.lotSize],["R:R",trade.rr?`1:${trade.rr}`:""],
-                      ["Risk",trade.riskDollars?`${tSym}${trade.riskDollars}`:""],["Status",trade.status],["Emotion",trade.emotion]
-                    ].filter(([,v])=>v).map(([label,val]) => (
-                      <div key={label} style={S.detailStat}><div style={S.detailStatLabel}>{label}</div><div style={S.detailStatVal}>{val}</div></div>
-                    ))}
-                  </div>
-                  {trade.confluences?.length>0 && <div style={S.detailSection}><div style={S.sectionLabel}>CONFLUENCES</div><div style={S.confGrid}>{trade.confluences.map(c=><span key={c} style={S.confActive2}>{c}</span>)}</div></div>}
-                  {trade.notes && <div style={S.detailSection}><div style={S.sectionLabel}>NOTES</div><div style={S.notesBox}>{trade.notes}</div></div>}
-                  {trade.screenshot && <div style={S.detailSection}><div style={S.sectionLabel}>SCREENSHOT</div><a href={trade.screenshot} target="_blank" rel="noopener noreferrer" style={S.screenshotLink}>Open Chart →</a></div>}
-                  <div style={S.detailActions}>
-                    <button style={S.editBtn} onClick={() => editTrade(trade)}>EDIT</button>
-                    <button style={S.deleteBtn} onClick={() => deleteTrade(trade.id)}>DELETE</button>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── ANALYTICS ── */}
-            {view === "stats" && (
-              <div style={S.statsContainer}>
-                <div style={S.statsTitle}>PERFORMANCE ANALYTICS</div>
-                <div style={S.statsGrid}>
-                  <StatCard label={`BALANCE (${account.currency||'USD'})`} value={`${sym}${parseFloat(currentBalance).toLocaleString()}`} color={totalPnL>=0?"#4ade80":"#f87171"} />
-                  <StatCard label={`TOTAL P&L (${account.currency||'USD'})`} value={`${totalPnL>=0?"+":""}${sym}${totalPnL.toFixed(2)}`} color={totalPnL>=0?"#4ade80":"#f87171"} />
-                  <StatCard label="WIN RATE" value={`${winRate}%`} />
-                  <StatCard label="AVG R:R" value={avgRR!=="—"?`1:${avgRR}`:"—"} color="#a78bfa" />
-                  <StatCard label="WINS" value={wins} color="#4ade80" />
-                  <StatCard label="LOSSES" value={losses} color="#f87171" />
-                  <StatCard label="TOTAL TRADES" value={trades.length} />
-                  <StatCard label="RISK/TRADE" value={`${sym}${riskPerTrade}`} color="#e2c87b" />
-                </div>
-
-                {closedTrades.length > 1 && (() => {
-                  const sorted = [...closedTrades].sort((a,b) => new Date(a.date+" "+(a.time||"00:00"))-new Date(b.date+" "+(b.time||"00:00")));
-                  let bal = parseFloat(account.balance);
-                  const points = sorted.map((t,i) => { bal+=parseFloat(t.pnlDollars||0); return { i:i+1, bal }; });
-                  const min=Math.min(...points.map(p=>p.bal)), max=Math.max(...points.map(p=>p.bal)), range=max-min||1;
-                  const H=80;
-                  const pts = points.map((p,i) => `${(i/(points.length-1))*100},${H-((p.bal-min)/range)*H}`).join(" ");
-                  const lastBal = points[points.length-1].bal;
-                  return (
-                    <div style={S.detailSection}>
-                      <div style={S.sectionLabel}>EQUITY CURVE</div>
-                      <div style={S.equityBox}>
-                        <svg viewBox={`0 0 100 ${H}`} style={{ width:"100%", height:80 }} preserveAspectRatio="none">
-                          <polyline points={pts} fill="none" stroke={lastBal>=parseFloat(account.balance)?"#4ade80":"#f87171"} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                        </svg>
-                        <div style={S.equityMeta}>
-                          <span style={S.equityStart}>{sym}{parseFloat(account.balance).toLocaleString()}</span>
-                          <span style={{ ...S.equityEnd, color:lastBal>=parseFloat(account.balance)?"#4ade80":"#f87171" }}>{sym}{lastBal.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {closedTrades.length > 0 && (() => {
-                  const bySetup = {};
-                  closedTrades.forEach(t => { const s=t.setup||"Untagged"; if(!bySetup[s]) bySetup[s]={count:0,pnl:0,wins:0}; bySetup[s].count++; bySetup[s].pnl+=parseFloat(t.pnlDollars||0); if(parseFloat(t.pnlDollars)>0) bySetup[s].wins++; });
-                  return (
-                    <div style={S.detailSection}>
-                      <div style={S.sectionLabel}>P&L BY SETUP</div>
-                      {Object.entries(bySetup).sort((a,b)=>b[1].pnl-a[1].pnl).map(([s,d]) => (
-                        <div key={s} style={S.setupRow}>
-                          <span style={S.setupName}>{s}</span>
-                          <span style={S.setupCount}>{d.count} trades</span>
-                          <span style={S.setupWR}>{((d.wins/d.count)*100).toFixed(0)}% WR</span>
-                          <span style={{ ...S.setupPnL, color:d.pnl>=0?"#4ade80":"#f87171" }}>{d.pnl>=0?"+":""}{sym}{d.pnl.toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                {closedTrades.length > 0 && (() => {
-                  const byEmo = {};
-                  closedTrades.forEach(t => { const e=t.emotion||"Neutral"; if(!byEmo[e]) byEmo[e]={count:0,pnl:0,wins:0}; byEmo[e].count++; byEmo[e].pnl+=parseFloat(t.pnlDollars||0); if(parseFloat(t.pnlDollars)>0) byEmo[e].wins++; });
-                  return (
-                    <div style={S.detailSection}>
-                      <div style={S.sectionLabel}>P&L BY EMOTION</div>
-                      {Object.entries(byEmo).sort((a,b)=>b[1].pnl-a[1].pnl).map(([e,d]) => (
-                        <div key={e} style={S.setupRow}>
-                          <span style={S.setupName}>{e}</span>
-                          <span style={S.setupCount}>{d.count} trades</span>
-                          <span style={S.setupWR}>{((d.wins/d.count)*100).toFixed(0)}% WR</span>
-                          <span style={{ ...S.setupPnL, color:d.pnl>=0?"#4ade80":"#f87171" }}>{d.pnl>=0?"+":""}{sym}{d.pnl.toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-                <div style={S.detailSection}>
-                  <div style={S.sectionLabel}>EXPORT</div>
-                  <button style={S.exportBtn} onClick={() => {
-                    const csv = [
-                      ["Date","Time","Mode","Direction","Session","Setup","Entry","SL","TP","ExitPrice","ExitTime","Lots","Risk","RR","PnL","Status","Emotion","Notes"].join(","),
-                      ...trades.map(t => [t.date,t.time,t.mode,t.direction,t.session,t.setup,t.entryPrice,t.stopLoss,t.takeProfit,t.exitPrice,t.exitTime,t.lotSize,t.riskDollars,t.rr,t.pnlDollars,t.status,t.emotion,`"${(t.notes||"").replace(/"/g,'""')}"`].join(","))
-                    ].join("\n");
-                    const blob = new Blob([csv],{type:"text/csv"});
-                    const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="xauusd_journal.csv"; a.click();
-                  }}>EXPORT CSV</button>
-                </div>
-              </div>
-            )}
-          </main>
-
-          {/* SETTINGS MODAL */}
-          {showSettings && (
-            <div style={S.modalOverlay} onClick={() => setShowSettings(false)}>
-              <div style={S.modal} onClick={e => e.stopPropagation()}>
-                <div style={S.modalTitle}>ACCOUNT SETTINGS</div>
-                <FF label="CURRENCY">
-                  <div style={S.riskRow}>
-                    {['USD','GBP','EUR'].map(c => (
-                      <button key={c} style={{ ...S.currencyBtn, ...(settingsForm.currency===c?S.currencyActive:{}) }}
-                        onClick={() => setSettingsForm(s => ({ ...s, currency:c }))}>
-                        {CURRENCY_SYMBOLS[c]} {c}
-                      </button>
-                    ))}
-                  </div>
-                </FF>
-                <FF label={`ACCOUNT BALANCE (${settingsForm.currency||'USD'})`}>
-                  <div style={{ position:"relative" }}>
-                    <span style={S.inputPrefix}>{CURRENCY_SYMBOLS[settingsForm.currency||'USD']}</span>
-                    <input style={{ ...S.input, paddingLeft:24 }} type="number" value={settingsForm.balance}
-                      onChange={e => setSettingsForm(s => ({ ...s, balance:e.target.value }))} placeholder="10000" />
-                  </div>
-                </FF>
-                <FF label="RISK PER TRADE (%)">
-                  <div style={S.riskRow}>
-                    {[0.5,1,1.5,2].map(r => (
-                      <button key={r} style={{ ...S.riskPill, ...(parseFloat(settingsForm.riskPercent)===r?S.riskPillActive:{}) }}
-                        onClick={() => setSettingsForm(s => ({ ...s, riskPercent:r }))}>{r}%</button>
-                    ))}
-                    <input style={{ ...S.input, width:70 }} type="number" step="0.1" value={settingsForm.riskPercent}
-                      onChange={e => setSettingsForm(s => ({ ...s, riskPercent:e.target.value }))} />
-                  </div>
-                </FF>
-                <div style={S.riskPreview}>
-                  Risk per trade: <strong style={{ color:"#e2c87b" }}>
-                    {CURRENCY_SYMBOLS[settingsForm.currency||'USD']}{(parseFloat(settingsForm.balance||0)*parseFloat(settingsForm.riskPercent||0)/100).toFixed(2)} {settingsForm.currency||'USD'}
-                  </strong>
-                </div>
-                <div style={S.formActions}>
-                  <button style={S.cancelBtn} onClick={() => setShowSettings(false)}>CANCEL</button>
-                  <button style={S.saveBtn} onClick={() => {
-                    const newAcc = { balance:parseFloat(settingsForm.balance), riskPercent:parseFloat(settingsForm.riskPercent), currency:settingsForm.currency||'USD' };
-                    setAccount(newAcc); applyAccountToForm(newAcc); setShowSettings(false); showToast("Settings saved ✓");
-                  }}>SAVE</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {view === "journal" && (
-            <button style={S.fab} onClick={goToAdd}>+</button>
-          )}
-
-          {toast && <div style={S.toast}>{toast}</div>}
+  <div id="view-add" class="view">
+    <div class="form-wrap">
+      <div class="form-title mono" id="form-title">LOG TRADE</div>
+      <div class="risk-banner">
+        <span class="risk-banner-lbl mono">AUTO RISK</span>
+        <span class="risk-banner-val mono" id="risk-banner-txt"></span>
+        <button class="risk-edit-btn mono" onclick="openSettings()">Edit</button>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <div class="field-label mono">MODE</div>
+          <div class="seg-wrap" id="seg-mode">
+            <button class="seg-btn mono active" onclick="segClick('mode','backtest',this)">BACKTEST</button>
+            <button class="seg-btn mono" onclick="segClick('mode','live',this)">LIVE</button>
+          </div>
         </div>
-      );
-    }
-
-    function FF({ label, children }) {
-      return <div style={{ marginBottom:14 }}><div style={styles.fieldLabel}>{label}</div>{children}</div>;
-    }
-    function Seg({ options, value, onChange, colors={} }) {
-      return (
-        <div style={styles.segmentWrap}>
-          {options.map(o => (
-            <button key={o} style={{ ...styles.segBtn, ...(value===o?{ ...styles.segActive, ...(colors[o]?{background:colors[o]+"22",borderColor:colors[o],color:colors[o]}:{}) }:{}) }}
-              onClick={() => onChange(o)}>{o.toUpperCase()}</button>
-          ))}
+        <div class="field">
+          <div class="field-label mono">DIRECTION</div>
+          <div class="seg-wrap" id="seg-dir">
+            <button class="seg-btn mono active-long active" onclick="segClick('direction','Long',this)">LONG</button>
+            <button class="seg-btn mono" onclick="segClick('direction','Short',this)">SHORT</button>
+          </div>
         </div>
-      );
-    }
-    function StatCard({ label, value, color="#e2c87b" }) {
-      return <div style={styles.statCard}><div style={styles.statLabel}>{label}</div><div style={{ ...styles.statVal, color }}>{value}</div></div>;
-    }
+      </div>
+      <div class="field">
+        <div class="field-label mono">OUTCOME</div>
+        <div class="status-row">
+          <button class="status-btn s-open mono" onclick="setStatus('Open')">○ OPEN</button>
+          <button class="status-btn mono" onclick="setStatus('Win')">✓ WIN</button>
+          <button class="status-btn mono" onclick="setStatus('Loss')">✗ LOSS</button>
+          <button class="status-btn mono" onclick="setStatus('Breakeven')">≈ BE</button>
+        </div>
+        <div class="auto-hint mono" id="exit-hint"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><div class="field-label mono">DATE</div><input type="date" id="f-date" oninput="formCalc()"></div>
+        <div class="field"><div class="field-label mono">ENTRY TIME (GMT)</div><input type="time" id="f-time" oninput="onTimeChange()"></div>
+        <div class="field"><div class="field-label mono">SESSION (AUTO)</div>
+          <select id="f-session"><option>Sydney</option><option>Tokyo</option><option selected>London</option><option>New York</option><option>London/NY Overlap</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field"><div class="field-label mono">ENTRY PRICE *</div><input type="number" step="0.01" id="f-entry" placeholder="2345.00" oninput="formCalc()"></div>
+        <div class="field"><div class="field-label mono">STOP LOSS</div><input type="number" step="0.01" id="f-sl" class="sl-inp" placeholder="2335.00" oninput="formCalc()"></div>
+        <div class="field"><div class="field-label mono">TAKE PROFIT</div><input type="number" step="0.01" id="f-tp" class="tp-inp" placeholder="2365.00" oninput="formCalc()"></div>
+      </div>
+      <div id="auto-strip" style="display:none" class="auto-strip">
+        <div class="chip"><span class="chip-lbl mono">LOT SIZE (AUTO)</span><span class="chip-val mono" id="chip-lot"></span></div>
+        <div class="chip"><span class="chip-lbl mono">R:R</span><span class="chip-val purple mono" id="chip-rr"></span></div>
+        <div class="chip"><span class="chip-lbl mono">RISK</span><span class="chip-val red mono" id="chip-risk"></span></div>
+        <div class="chip"><span class="chip-lbl mono">SL PIPS</span><span class="chip-val muted mono" id="chip-pips"></span></div>
+      </div>
+      <div id="warn-lot" class="warn" style="display:none"></div>
+      <div id="warn-side" class="warn" style="display:none"></div>
+      <div class="form-row">
+        <div class="field"><div class="field-label mono">LOT SIZE (AUTO)</div><input type="number" step="0.01" id="f-lots" class="lot-inp" placeholder="auto" oninput="formCalc()"></div>
+        <div class="field"><div class="field-label mono">EXIT PRICE (AUTO)</div><input type="number" step="0.01" id="f-exit" placeholder="auto on Win/Loss" oninput="formCalc()"></div>
+        <div class="field"><div class="field-label mono">EXIT TIME</div><input type="time" id="f-exit-time"></div>
+      </div>
+      <div id="pnl-strip" style="display:none" class="auto-strip">
+        <div class="chip"><span class="chip-lbl mono">P&amp;L</span><span class="chip-val big mono" id="chip-pnl"></span></div>
+        <div class="chip"><span class="chip-lbl mono">RESULT</span><span class="chip-val purple mono" id="chip-result"></span></div>
+      </div>
+      <div class="field"><div class="field-label mono">SETUP</div>
+        <select id="f-setup">
+          <option value="">— Select —</option>
+          <option>ICT Breaker</option><option>OTE Retracement</option><option>Liquidity Grab</option>
+          <option>Market Structure Shift</option><option>Range Break</option><option>News Trade</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><div class="field-label mono">CONFLUENCES</div><div class="conf-grid" id="conf-grid"></div></div>
+      <div class="field"><div class="field-label mono">EMOTIONAL STATE</div><div class="conf-grid" id="emotion-grid"></div></div>
+      <div class="field"><div class="field-label mono">TRADE NOTES</div><textarea id="f-notes" placeholder="Setup reasoning, market context..."></textarea></div>
+      <div class="field"><div class="field-label mono">SCREENSHOT URL</div><input type="url" id="f-ss" placeholder="https://tradingview.com/x/..."></div>
+      <div class="form-actions">
+        <button class="cancel-btn mono" onclick="showView('journal',null);renderJournal()">CANCEL</button>
+        <button class="save-btn mono" id="save-btn" onclick="saveTrade()">SAVE TRADE</button>
+      </div>
+    </div>
+  </div>
 
-    const styles = {
-      root:{ minHeight:"100vh", background:"#0a0a0c", color:"#e8e0d0", fontFamily:"'Syne',sans-serif", paddingBottom:60 },
-      header:{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 20px", borderBottom:"1px solid #1e1e24", background:"#0d0d10", flexWrap:"wrap", gap:10 },
-      headerLeft:{ display:"flex", alignItems:"center", gap:12 },
-      logo:{ fontSize:26, color:"#e2c87b" },
-      title:{ fontSize:18, fontWeight:800, letterSpacing:"0.04em" },
-      subtitle:{ fontSize:9, letterSpacing:"0.2em", color:"#555", fontFamily:"'Space Mono',monospace" },
-      headerRight:{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" },
-      balanceBox:{ display:"flex", flexDirection:"column", alignItems:"flex-end", padding:"4px 10px", background:"#141418", border:"1px solid #2a2a32", borderRadius:6 },
-      balLabel:{ fontSize:8, letterSpacing:"0.15em", color:"#666", fontFamily:"'Space Mono',monospace" },
-      balVal:{ fontSize:14, fontWeight:700, fontFamily:"'Space Mono',monospace" },
-      riskBadge:{ display:"flex", flexDirection:"column", alignItems:"flex-end", padding:"4px 10px", background:"#141418", border:"1px solid #f8717133", borderRadius:6 },
-      riskLabel:{ fontSize:8, letterSpacing:"0.15em", color:"#f87171", fontFamily:"'Space Mono',monospace" },
-      riskVal:{ fontSize:11, color:"#f87171", fontFamily:"'Space Mono',monospace" },
-      spotBox:{ display:"flex", alignItems:"center", gap:6, background:"#141418", border:"1px solid #2a2a32", borderRadius:6, padding:"6px 10px" },
-      spotLabel:{ fontSize:9, letterSpacing:"0.15em", color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
-      spotInput:{ background:"none", border:"none", outline:"none", color:"#e8e0d0", fontFamily:"'Space Mono',monospace", fontSize:13, width:80 },
-      settingsBtn:{ background:"#141418", border:"1px solid #2a2a32", color:"#888", fontSize:16, padding:"6px 10px", borderRadius:6, cursor:"pointer" },
-      nav:{ display:"flex", gap:2, padding:"0 20px", borderBottom:"1px solid #1e1e24", background:"#0d0d10" },
-      navBtn:{ padding:"11px 18px", background:"none", border:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.15em", cursor:"pointer", borderBottom:"2px solid transparent", marginBottom:-1 },
-      navActive:{ color:"#e2c87b", borderBottomColor:"#e2c87b" },
-      main:{ maxWidth:900, margin:"0 auto", padding:"20px 16px" },
-      filterRow:{ display:"flex", alignItems:"center", gap:14, marginBottom:18, flexWrap:"wrap" },
-      filterGroup:{ display:"flex", alignItems:"center", gap:5 },
-      filterLabel:{ fontSize:9, letterSpacing:"0.15em", color:"#555", fontFamily:"'Space Mono',monospace" },
-      pill:{ padding:"3px 9px", border:"1px solid #2a2a32", borderRadius:20, background:"none", color:"#555", fontSize:9, letterSpacing:"0.1em", fontFamily:"'Space Mono',monospace", cursor:"pointer" },
-      pillActive:{ borderColor:"#e2c87b", color:"#e2c87b", background:"#e2c87b11" },
-      tradeCount:{ fontSize:10, color:"#444", fontFamily:"'Space Mono',monospace" },
-      logBtn:{ marginLeft:"auto", padding:"5px 14px", background:"#e2c87b", border:"none", borderRadius:4, color:"#0a0a0c", fontFamily:"'Space Mono',monospace", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em", whiteSpace:"nowrap" },
-      empty:{ textAlign:"center", padding:"70px 20px", color:"#555" },
-      emptyIcon:{ fontSize:44, color:"#2a2a32", marginBottom:14 },
-      ctaBtn:{ marginTop:16, padding:"9px 22px", background:"#e2c87b22", border:"1px solid #e2c87b55", color:"#e2c87b", fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.1em", borderRadius:4, cursor:"pointer" },
-      tradeList:{ display:"flex", flexDirection:"column", gap:9 },
-      tradeCard:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:8, padding:"12px 14px", cursor:"pointer" },
-      cardWin:{ borderLeft:"3px solid #4ade8055" },
-      cardLoss:{ borderLeft:"3px solid #f8717155" },
-      cardTop:{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:7 },
-      cardLeft:{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" },
-      cardRight:{ display:"flex", alignItems:"center", gap:7 },
-      modeBadge:{ fontSize:8, letterSpacing:"0.12em", padding:"2px 6px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
-      modeLive:{ background:"#4ade8018", color:"#4ade80", border:"1px solid #4ade8040" },
-      modeBacktest:{ background:"#e2c87b18", color:"#e2c87b", border:"1px solid #e2c87b40" },
-      dirBadge:{ fontSize:9, padding:"2px 7px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
-      longBadge:{ background:"#4ade8018", color:"#4ade80", border:"1px solid #4ade8040" },
-      shortBadge:{ background:"#f8717118", color:"#f87171", border:"1px solid #f8717140" },
-      cardSession:{ fontSize:9, color:"#555", fontFamily:"'Space Mono',monospace" },
-      setupTagSmall:{ fontSize:9, color:"#60a5fa", background:"#60a5fa15", padding:"2px 7px", borderRadius:3, border:"1px solid #60a5fa30", fontFamily:"'Space Mono',monospace" },
-      pnlTag:{ fontSize:13, fontWeight:700, fontFamily:"'Space Mono',monospace" },
-      openTag:{ fontSize:8, color:"#e2c87b", border:"1px solid #e2c87b55", padding:"2px 6px", borderRadius:3, fontFamily:"'Space Mono',monospace" },
-      cardMid:{ marginBottom:5 },
-      priceRow:{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap" },
-      priceLabel:{ fontSize:8, color:"#444", letterSpacing:"0.1em", fontFamily:"'Space Mono',monospace" },
-      priceVal:{ fontSize:11, color:"#bbb", fontFamily:"'Space Mono',monospace" },
-      rrTag:{ fontSize:9, color:"#a78bfa", fontFamily:"'Space Mono',monospace", background:"#a78bfa18", padding:"1px 6px", borderRadius:3, border:"1px solid #a78bfa40" },
-      cardBot:{ display:"flex", justifyContent:"space-between" },
-      dateText:{ fontSize:9, color:"#444", fontFamily:"'Space Mono',monospace" },
-      lotText:{ fontSize:9, color:"#444", fontFamily:"'Space Mono',monospace" },
-      formContainer:{ maxWidth:680, margin:"0 auto" },
-      formTitle:{ fontSize:15, fontWeight:800, letterSpacing:"0.1em", marginBottom:18, color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
-      riskBanner:{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", background:"#f8717110", border:"1px solid #f8717133", borderRadius:6, marginBottom:18, flexWrap:"wrap" },
-      riskBannerLabel:{ fontSize:8, letterSpacing:"0.18em", color:"#f87171", fontFamily:"'Space Mono',monospace" },
-      riskBannerVal:{ fontSize:12, color:"#f87171", fontFamily:"'Space Mono',monospace", flex:1 },
-      riskEditBtn:{ fontSize:9, color:"#666", background:"none", border:"1px solid #333", padding:"2px 8px", borderRadius:3, cursor:"pointer", fontFamily:"'Space Mono',monospace" },
-      formRow:{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(170px, 1fr))", gap:10, marginBottom:4 },
-      fieldLabel:{ fontSize:8, letterSpacing:"0.2em", color:"#555", marginBottom:5, fontFamily:"'Space Mono',monospace" },
-      input:{ width:"100%", background:"#111115", border:"1px solid #2a2a32", borderRadius:5, padding:"8px 11px", color:"#e8e0d0", fontFamily:"'Space Mono',monospace", fontSize:12, outline:"none" },
-      statusRow:{ display:"flex", gap:8, flexWrap:"wrap" },
-      statusBtn:{ flex:1, minWidth:70, padding:"10px 8px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:5, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:700, cursor:"pointer", letterSpacing:"0.05em" },
-      statusOpen:{ background:"#e2c87b18", borderColor:"#e2c87b66", color:"#e2c87b" },
-      statusWin:{ background:"#4ade8022", borderColor:"#4ade8066", color:"#4ade80" },
-      statusLoss:{ background:"#f8717122", borderColor:"#f8717166", color:"#f87171" },
-      statusBE:{ background:"#60a5fa18", borderColor:"#60a5fa55", color:"#60a5fa" },
-      autoFillHint:{ fontSize:10, color:"#888", fontFamily:"'Space Mono',monospace", marginTop:6, paddingLeft:4 },
-      autoStrip:{ display:"flex", flexWrap:"wrap", gap:10, padding:"10px 14px", background:"#a78bfa0a", border:"1px solid #a78bfa22", borderRadius:6, marginBottom:14 },
-      autoChip:{ display:"flex", flexDirection:"column", gap:2 },
-      chipLabel:{ fontSize:7, letterSpacing:"0.18em", color:"#666", fontFamily:"'Space Mono',monospace" },
-      chipVal:{ fontSize:14, fontWeight:700, color:"#e8e0d0", fontFamily:"'Space Mono',monospace" },
-      segmentWrap:{ display:"flex", flexWrap:"wrap", gap:4 },
-      segBtn:{ padding:"6px 11px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:4, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:9, letterSpacing:"0.1em", cursor:"pointer" },
-      segActive:{ background:"#e2c87b18", borderColor:"#e2c87b66", color:"#e2c87b" },
-      confGrid:{ display:"flex", flexWrap:"wrap", gap:5 },
-      confBtn:{ padding:"4px 9px", border:"1px solid #2a2a32", borderRadius:3, background:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:9, cursor:"pointer" },
-      confActive:{ borderColor:"#60a5fa66", background:"#60a5fa18", color:"#60a5fa" },
-      confActive2:{ padding:"3px 9px", border:"1px solid #60a5fa55", borderRadius:3, background:"#60a5fa18", color:"#60a5fa", fontFamily:"'Space Mono',monospace", fontSize:9 },
-      formActions:{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:22, paddingTop:18, borderTop:"1px solid #1e1e24" },
-      cancelBtn:{ padding:"9px 18px", background:"none", border:"1px solid #2a2a32", borderRadius:4, color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", letterSpacing:"0.08em" },
-      saveBtn:{ padding:"9px 24px", background:"#e2c87b", border:"none", borderRadius:4, color:"#0a0a0c", fontFamily:"'Space Mono',monospace", fontSize:10, fontWeight:700, cursor:"pointer", letterSpacing:"0.08em" },
-      detailContainer:{ maxWidth:680, margin:"0 auto" },
-      backBtn:{ background:"none", border:"none", color:"#555", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", marginBottom:18, letterSpacing:"0.1em" },
-      detailHeader:{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:10 },
-      bigPnL:{ fontSize:26, fontWeight:800, fontFamily:"'Space Mono',monospace" },
-      detailGrid:{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(120px, 1fr))", gap:8, marginBottom:20 },
-      detailStat:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:"9px 11px" },
-      detailStatLabel:{ fontSize:8, color:"#444", letterSpacing:"0.15em", marginBottom:3, fontFamily:"'Space Mono',monospace" },
-      detailStatVal:{ fontSize:13, color:"#e8e0d0", fontFamily:"'Space Mono',monospace" },
-      detailSection:{ marginBottom:18 },
-      sectionLabel:{ fontSize:8, letterSpacing:"0.2em", color:"#555", marginBottom:9, fontFamily:"'Space Mono',monospace" },
-      notesBox:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:12, fontSize:12, color:"#999", lineHeight:1.6, fontFamily:"'Space Mono',monospace" },
-      screenshotLink:{ color:"#60a5fa", fontFamily:"'Space Mono',monospace", fontSize:11, textDecoration:"none" },
-      detailActions:{ display:"flex", gap:10, marginTop:26, paddingTop:18, borderTop:"1px solid #1e1e24" },
-      editBtn:{ padding:"8px 18px", background:"#e2c87b22", border:"1px solid #e2c87b55", color:"#e2c87b", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
-      deleteBtn:{ padding:"8px 18px", background:"#f8717118", border:"1px solid #f8717144", color:"#f87171", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
-      statsContainer:{ maxWidth:680, margin:"0 auto" },
-      statsTitle:{ fontSize:15, fontWeight:800, letterSpacing:"0.1em", marginBottom:20, color:"#e2c87b", fontFamily:"'Space Mono',monospace" },
-      statsGrid:{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:9, marginBottom:24 },
-      statCard:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:8, padding:"14px 12px", textAlign:"center" },
-      statLabel:{ fontSize:8, color:"#555", letterSpacing:"0.15em", marginBottom:7, fontFamily:"'Space Mono',monospace" },
-      statVal:{ fontSize:20, fontWeight:700, fontFamily:"'Space Mono',monospace" },
-      equityBox:{ background:"#111115", border:"1px solid #1e1e28", borderRadius:6, padding:"12px 14px" },
-      equityMeta:{ display:"flex", justifyContent:"space-between", marginTop:6 },
-      equityStart:{ fontSize:10, color:"#555", fontFamily:"'Space Mono',monospace" },
-      equityEnd:{ fontSize:10, fontFamily:"'Space Mono',monospace", fontWeight:700 },
-      setupRow:{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #1a1a1f", flexWrap:"wrap" },
-      setupName:{ fontSize:11, color:"#ccc", flex:1, minWidth:90, fontFamily:"'Space Mono',monospace" },
-      setupCount:{ fontSize:9, color:"#555", fontFamily:"'Space Mono',monospace" },
-      setupWR:{ fontSize:9, color:"#a78bfa", fontFamily:"'Space Mono',monospace" },
-      setupPnL:{ fontSize:11, fontWeight:700, fontFamily:"'Space Mono',monospace", minWidth:80, textAlign:"right" },
-      exportBtn:{ padding:"8px 18px", background:"none", border:"1px solid #2a2a32", color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer", borderRadius:4 },
-      modalOverlay:{ position:"fixed", inset:0, background:"#000000bb", zIndex:100, display:"flex", alignItems:"center", justifyContent:"center", padding:20 },
-      modal:{ background:"#111115", border:"1px solid #2a2a32", borderRadius:10, padding:24, width:"100%", maxWidth:380 },
-      modalTitle:{ fontSize:13, fontWeight:800, letterSpacing:"0.12em", color:"#e2c87b", fontFamily:"'Space Mono',monospace", marginBottom:20 },
-      riskRow:{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" },
-      riskPill:{ padding:"5px 10px", border:"1px solid #2a2a32", borderRadius:4, background:"none", color:"#666", fontFamily:"'Space Mono',monospace", fontSize:10, cursor:"pointer" },
-      riskPillActive:{ borderColor:"#f87171", color:"#f87171", background:"#f8717118" },
-      riskPreview:{ fontSize:11, color:"#888", fontFamily:"'Space Mono',monospace", marginTop:8, marginBottom:4 },
-      currencyBtn:{ padding:"7px 14px", background:"#0d0d10", border:"1px solid #2a2a32", borderRadius:4, color:"#555", fontFamily:"'Space Mono',monospace", fontSize:11, fontWeight:700, cursor:"pointer" },
-      currencyActive:{ background:"#e2c87b22", borderColor:"#e2c87b", color:"#e2c87b" },
-      inputPrefix:{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#888", fontFamily:"'Space Mono',monospace", fontSize:13, pointerEvents:"none" },
-      warnBanner:{ background:"#f8717118", border:"1px solid #f8717155", borderRadius:5, padding:"8px 12px", fontSize:10, color:"#f87171", fontFamily:"'Space Mono',monospace", marginBottom:12, lineHeight:1.6 },
-      fab:{ position:"fixed", bottom:28, right:24, width:52, height:52, borderRadius:"50%", background:"#e2c87b", border:"none", color:"#0a0a0c", fontSize:28, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 20px #e2c87b44", zIndex:50 },
-      toast:{ position:"fixed", bottom:22, left:"50%", transform:"translateX(-50%)", background:"#1e1e28", border:"1px solid #e2c87b55", color:"#e2c87b", padding:"9px 22px", borderRadius:20, fontFamily:"'Space Mono',monospace", fontSize:10, letterSpacing:"0.1em", zIndex:200, whiteSpace:"nowrap" },
-    };
+  <div id="view-detail" class="view"><div class="detail-wrap" id="detail-content"></div></div>
+  <div id="view-stats" class="view"><div class="stats-wrap" id="stats-content"></div></div>
+</main>
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="modal-title mono">ACCOUNT SETTINGS</div>
+    <div class="field"><div class="field-label mono">CURRENCY</div>
+      <div class="curr-row">
+        <button class="curr-btn mono active" onclick="setCurrency('USD',this)">$ USD</button>
+        <button class="curr-btn mono" onclick="setCurrency('GBP',this)">£ GBP</button>
+        <button class="curr-btn mono" onclick="setCurrency('EUR',this)">€ EUR</button>
+      </div>
+    </div>
+    <div class="field"><div class="field-label mono" id="bal-field-lbl">ACCOUNT BALANCE (USD)</div>
+      <div class="inp-wrap"><span class="inp-prefix mono" id="bal-prefix">$</span><input type="number" id="s-balance" value="10000" oninput="updateRiskPreview()"></div>
+    </div>
+    <div class="field"><div class="field-label mono">RISK PER TRADE (%)</div>
+      <div class="risk-row">
+        <button class="risk-pill mono" onclick="setRiskPct(0.5,this)">0.5%</button>
+        <button class="risk-pill mono active" onclick="setRiskPct(1,this)">1%</button>
+        <button class="risk-pill mono" onclick="setRiskPct(1.5,this)">1.5%</button>
+        <button class="risk-pill mono" onclick="setRiskPct(2,this)">2%</button>
+        <input type="number" step="0.1" id="s-risk" value="1" style="width:70px" oninput="syncRiskPills();updateRiskPreview()">
+      </div>
+    </div>
+    <div class="risk-preview mono" id="risk-preview"></div>
+    <div class="form-actions">
+      <button class="cancel-btn mono" onclick="closeSettings()">CANCEL</button>
+      <button class="save-btn mono" onclick="saveSettings()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab mono" id="fab" onclick="showView('add',null);newTrade()">+</button>
+<div class="toast mono" id="toast"></div>
+
+<script>
+// ─── SUPABASE CONFIG ──────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://bsilqmdjezdhovbycquw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzaWxxbWRqZXpkaG92YnljcXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MTQxNzksImV4cCI6MjA5NTE5MDE3OX0.skTUoGhhUYe1WHw1iaegmIITfpUky1Q3pPIb-u4Ced8';
+const DB = `${SUPABASE_URL}/rest/v1/trades`;
+const HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const ACC_KEY = 'xauusd-j-account-v3';
+const SYMS = { USD:'$', GBP:'£', EUR:'€' };
+const CONFS = ["HTF Trend","BOS/CHoCH","Order Block","FVG","Liquidity Sweep","PDH/PDL","EMA Cross","Volume Spike","News Catalyst","Session Open","Support/Resistance","Golden Ratio","VWAP","Fibonacci"];
+const EMOTIONS = ["Disciplined","Confident","Neutral","Anxious","FOMO","Revenge"];
+
+let trades = [];
+let account = { balance:10000, riskPercent:1, currency:'USD' };
+let editId = null;
+let filterMode = 'All', filterDir = 'All';
+let formState = { mode:'backtest', direction:'Long', status:'Open', confluences:[], emotion:'Neutral' };
+
+// ─── SUPABASE API ─────────────────────────────────────────────────────────────
+function setSyncStatus(s){ const d=document.getElementById('sync-dot'); d.className='sync-dot mono '+s; }
+
+async function dbFetch(){
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(`${DB}?order=id.desc`, { headers: HEADERS });
+    if(!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    trades = data.map(dbToTrade);
+    setSyncStatus('ok');
+    return true;
+  } catch(e) {
+    setSyncStatus('err');
+    toast('Sync error — check connection');
+    return false;
+  }
+}
+
+async function dbInsert(trade){
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(DB, { method:'POST', headers: HEADERS, body: JSON.stringify(tradeToDb(trade)) });
+    if(!r.ok) throw new Error(await r.text());
+    setSyncStatus('ok');
+    return true;
+  } catch(e) { setSyncStatus('err'); toast('Save failed: '+e.message); return false; }
+}
+
+async function dbUpdate(trade){
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(`${DB}?id=eq.${trade.id}`, { method:'PATCH', headers: HEADERS, body: JSON.stringify(tradeToDb(trade)) });
+    if(!r.ok) throw new Error(await r.text());
+    setSyncStatus('ok');
+    return true;
+  } catch(e) { setSyncStatus('err'); toast('Update failed'); return false; }
+}
+
+async function dbDelete(id){
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(`${DB}?id=eq.${id}`, { method:'DELETE', headers: HEADERS });
+    if(!r.ok) throw new Error(await r.text());
+    setSyncStatus('ok');
+    return true;
+  } catch(e) { setSyncStatus('err'); toast('Delete failed'); return false; }
+}
+
+// Map between app format and DB column names
+function tradeToDb(t){
+  return {
+    id: t.id, user_id: 'default', mode: t.mode, date: t.date, time: t.time,
+    session: t.session, direction: t.direction, entry_price: t.entryPrice,
+    stop_loss: t.stopLoss, take_profit: t.takeProfit, lot_size: t.lotSize,
+    exit_price: t.exitPrice, exit_time: t.exitTime, status: t.status,
+    setup: t.setup, confluences: t.confluences||[], rr: t.rr,
+    pnl_dollars: t.pnlDollars, risk_dollars: t.riskDollars,
+    currency: t.currency||'USD', notes: t.notes, screenshot: t.screenshot, emotion: t.emotion
+  };
+}
+function dbToTrade(d){
+  return {
+    id: d.id, mode: d.mode, date: d.date, time: d.time, session: d.session,
+    direction: d.direction, entryPrice: d.entry_price, stopLoss: d.stop_loss,
+    takeProfit: d.take_profit, lotSize: d.lot_size, exitPrice: d.exit_price,
+    exitTime: d.exit_time, status: d.status, setup: d.setup,
+    confluences: d.confluences||[], rr: d.rr, pnlDollars: d.pnl_dollars,
+    riskDollars: d.risk_dollars, currency: d.currency||'USD',
+    notes: d.notes, screenshot: d.screenshot, emotion: d.emotion
+  };
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(async function init(){
+  try { const a=localStorage.getItem(ACC_KEY); if(a) account={...account,...JSON.parse(a)}; } catch(e){}
+  buildConfGrid(); buildEmotionGrid();
+  syncSettingsModal(); updateHeader(); updateRiskBanner();
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-time').value = new Date().toTimeString().slice(0,5);
+  await dbFetch();
+  renderJournal();
+})();
+
+function saveAccount(){ try{ localStorage.setItem(ACC_KEY, JSON.stringify(account)); }catch(e){} }
+
+// ─── MATH ─────────────────────────────────────────────────────────────────────
+function calcPnL(dir,entry,exit,lots){
+  const e=+entry,x=+exit,l=+lots;
+  if(!e||!x||!l) return null;
+  return ((dir==='Long'?(x-e):(e-x))*l*100).toFixed(2);
+}
+function calcRR(entry,sl,tp){
+  const e=+entry,s=+sl,t=+tp;
+  if(!e||!s||!t) return null;
+  const risk=Math.abs(e-s),reward=Math.abs(t-e);
+  return risk?((reward/risk).toFixed(2)):null;
+}
+function calcLots(entry,sl,riskAmt){
+  const e=+entry,s=+sl,r=+riskAmt;
+  if(!e||!s||!r) return null;
+  const slMove=Math.abs(e-s);
+  if(slMove<0.01) return null;
+  const lots=r/(slMove/0.01);
+  if(lots>100) return '100.00';
+  if(lots<0.01) return '0.01';
+  return lots.toFixed(2);
+}
+function detectSession(t){
+  if(!t) return 'London';
+  const [h,m]=t.split(':').map(Number),mins=h*60+m;
+  if(mins>=12*60&&mins<16*60) return 'London/NY Overlap';
+  if(mins>=7*60&&mins<12*60)  return 'London';
+  if(mins>=16*60&&mins<21*60) return 'New York';
+  if(mins>=0&&mins<6*60)      return 'Tokyo';
+  return 'Sydney';
+}
+
+// ─── VIEWS ────────────────────────────────────────────────────────────────────
+function showView(name, navBtn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(navBtn) navBtn.classList.add('active');
+  else { const m={journal:0,add:1,stats:2}; if(m[name]!==undefined) document.querySelectorAll('.nav-btn')[m[name]].classList.add('active'); }
+  document.getElementById('fab').style.display = name==='journal'?'flex':'none';
+}
+
+// ─── JOURNAL ──────────────────────────────────────────────────────────────────
+function setFilter(type,val,btn){
+  if(type==='mode'){ filterMode=val; document.querySelectorAll('.filter-grp:first-child .pill').forEach(b=>b.classList.remove('active')); }
+  else { filterDir=val; document.querySelectorAll('.filter-grp:last-of-type .pill').forEach(b=>b.classList.remove('active')); }
+  btn.classList.add('active'); renderJournal();
+}
+
+function renderJournal(){
+  const sym=SYMS[account.currency||'USD'];
+  const filtered=trades.filter(t=>(filterMode==='All'||t.mode===filterMode)&&(filterDir==='All'||t.direction===filterDir));
+  document.getElementById('trade-count').textContent=filtered.length+' TRADES';
+  const list=document.getElementById('trade-list');
+  if(!filtered.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">◈</div><div style="margin-bottom:8px">No trades yet</div><button class="cta-btn mono" onclick="showView('add',null);newTrade()">Log First Trade</button></div>`;
+    return;
+  }
+  list.innerHTML=filtered.map(t=>{
+    const pnl=parseFloat(t.pnlDollars||0),isWin=pnl>0,isLoss=pnl<0;
+    const tSym=SYMS[t.currency||account.currency||'USD'];
+    return `<div class="trade-card ${isWin?'win':isLoss?'loss':''}" onclick="openDetail(${t.id})">
+      <div class="card-top">
+        <div class="card-left">
+          <span class="mode-badge mono ${t.mode==='live'?'mode-live':'mode-bt'}">${t.mode==='live'?'● LIVE':'◆ BT'}</span>
+          <span class="dir-badge mono ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'} ${t.direction.toUpperCase()}</span>
+          <span class="sess-tag mono">${t.session||''}</span>
+          ${t.setup?`<span class="setup-tag mono">${t.setup}</span>`:''}
+        </div>
+        <div class="card-right">
+          ${t.pnlDollars!==''&&t.pnlDollars!=null?`<span class="pnl-tag mono" style="color:${isWin?'#4ade80':isLoss?'#f87171':'#aaa'}">${isWin?'+':''}${t.pnlDollars} ${t.currency||'USD'}</span>`:''}
+          ${t.status==='Open'?'<span class="open-tag mono">OPEN</span>':''}
+        </div>
+      </div>
+      <div class="card-mid"><div class="price-row">
+        <span class="plbl mono">ENTRY</span><span class="pval mono">${t.entryPrice}</span>
+        ${t.stopLoss?`<span class="plbl mono">SL</span><span class="pval pval-sl mono">${t.stopLoss}</span>`:''}
+        ${t.takeProfit?`<span class="plbl mono">TP</span><span class="pval pval-tp mono">${t.takeProfit}</span>`:''}
+        ${t.exitPrice&&t.status!=='Open'?`<span class="plbl mono">EXIT</span><span class="pval mono">${t.exitPrice}</span>`:''}
+        ${t.rr?`<span class="rr-tag mono">1:${t.rr}R</span>`:''}
+      </div></div>
+      <div class="card-bot">
+        <span class="date-txt mono">${t.date}${t.time?' • '+t.time:''}</span>
+        <span class="lot-txt mono">${t.lotSize?t.lotSize+' lots':''}${t.riskDollars?' • '+tSym+t.riskDollars+' risk':''}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── DETAIL ───────────────────────────────────────────────────────────────────
+function openDetail(id){
+  const trade=trades.find(t=>t.id===id); if(!trade) return;
+  const pnl=parseFloat(trade.pnlDollars||0),tSym=SYMS[trade.currency||account.currency||'USD'];
+  const rRes=trade.riskDollars&&trade.pnlDollars?(pnl/parseFloat(trade.riskDollars)).toFixed(2):null;
+  const stats=[['Date',trade.date],['Entry Time',trade.time],['Exit Time',trade.exitTime],
+    ['Entry',trade.entryPrice],['Stop Loss',trade.stopLoss],['Take Profit',trade.takeProfit],
+    ['Exit Price',trade.exitPrice],['Lot Size',trade.lotSize],['R:R',trade.rr?`1:${trade.rr}`:''],
+    ['Risk',trade.riskDollars?tSym+trade.riskDollars:''],['Status',trade.status],['Emotion',trade.emotion]
+  ].filter(([,v])=>v);
+  document.getElementById('detail-content').innerHTML=`
+    <button class="back-btn mono" onclick="showView('journal',null);renderJournal()">← BACK</button>
+    <div class="detail-header">
+      <div class="detail-badges">
+        <span class="mode-badge mono ${trade.mode==='live'?'mode-live':'mode-bt'}">${trade.mode==='live'?'● LIVE':'◆ BACKTEST'}</span>
+        <span class="dir-badge mono ${trade.direction==='Long'?'dir-long':'dir-short'}">${trade.direction==='Long'?'▲':'▼'} ${trade.direction}</span>
+        <span class="sess-tag mono">${trade.session||''}</span>
+        ${trade.setup?`<span class="setup-tag mono">${trade.setup}</span>`:''}
+      </div>
+      <div style="text-align:right">
+        ${trade.pnlDollars!=null&&trade.pnlDollars!==''?`<div class="big-pnl mono" style="color:${pnl>0?'#4ade80':pnl<0?'#f87171':'#aaa'}">${pnl>0?'+':''}${trade.pnlDollars} ${trade.currency||'USD'}</div>`:''}
+        ${rRes?`<div class="r-result mono">${parseFloat(rRes)>0?'+':''}${rRes}R</div>`:''}
+      </div>
+    </div>
+    <div class="detail-grid">${stats.map(([l,v])=>`<div class="dstat"><div class="dstat-lbl mono">${l}</div><div class="dstat-val mono">${v}</div></div>`).join('')}</div>
+    ${trade.confluences&&trade.confluences.length?`<div class="section"><div class="sec-lbl mono">CONFLUENCES</div><div class="conf-grid">${trade.confluences.map(c=>`<span class="conf-tag mono">${c}</span>`).join('')}</div></div>`:''}
+    ${trade.notes?`<div class="section"><div class="sec-lbl mono">NOTES</div><div class="notes-box mono">${trade.notes}</div></div>`:''}
+    ${trade.screenshot?`<div class="section"><div class="sec-lbl mono">SCREENSHOT</div><a href="${trade.screenshot}" target="_blank" class="ss-link mono">Open Chart →</a></div>`:''}
+    <div class="detail-actions">
+      <button class="edit-btn mono" onclick="editTrade(${trade.id})">EDIT</button>
+      <button class="del-btn mono" onclick="deleteTrade(${trade.id})">DELETE</button>
+    </div>`;
+  showView('detail',null);
+}
+
+async function deleteTrade(id){
+  if(!confirm('Delete this trade?')) return;
+  const ok=await dbDelete(id);
+  if(ok){ trades=trades.filter(t=>t.id!==id); showView('journal',null); renderJournal(); updateHeader(); toast('Trade deleted'); }
+}
+function editTrade(id){
+  const t=trades.find(tr=>tr.id===id); if(!t) return;
+  editId=id; loadFormFromTrade(t);
+  document.getElementById('form-title').textContent='EDIT TRADE';
+  document.getElementById('save-btn').textContent='UPDATE TRADE';
+  showView('add',null);
+}
+
+// ─── FORM ─────────────────────────────────────────────────────────────────────
+function newTrade(){
+  editId=null;
+  formState={mode:'backtest',direction:'Long',status:'Open',confluences:[],emotion:'Neutral'};
+  document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('f-time').value=new Date().toTimeString().slice(0,5);
+  document.getElementById('f-session').value=detectSession(document.getElementById('f-time').value);
+  ['f-entry','f-sl','f-tp','f-lots','f-exit','f-exit-time','f-notes','f-ss'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('f-setup').value='';
+  document.getElementById('form-title').textContent='LOG TRADE';
+  document.getElementById('save-btn').textContent='SAVE TRADE';
+  document.getElementById('exit-hint').textContent='';
+  updateSegButtons(); updateStatusButtons(); updateConfButtons(); updateEmotionButtons();
+  formCalc(); updateRiskBanner();
+}
+
+function loadFormFromTrade(t){
+  formState={mode:t.mode,direction:t.direction,status:t.status,confluences:[...(t.confluences||[])],emotion:t.emotion||'Neutral'};
+  document.getElementById('f-date').value=t.date||'';
+  document.getElementById('f-time').value=t.time||'';
+  document.getElementById('f-session').value=t.session||'London';
+  document.getElementById('f-entry').value=t.entryPrice||'';
+  document.getElementById('f-sl').value=t.stopLoss||'';
+  document.getElementById('f-tp').value=t.takeProfit||'';
+  document.getElementById('f-lots').value=t.lotSize||'';
+  document.getElementById('f-exit').value=t.exitPrice||'';
+  document.getElementById('f-exit-time').value=t.exitTime||'';
+  document.getElementById('f-setup').value=t.setup||'';
+  document.getElementById('f-notes').value=t.notes||'';
+  document.getElementById('f-ss').value=t.screenshot||'';
+  updateSegButtons(); updateStatusButtons(); updateConfButtons(); updateEmotionButtons(); formCalc();
+}
+
+function onTimeChange(){
+  document.getElementById('f-session').value=detectSession(document.getElementById('f-time').value);
+  formCalc();
+}
+
+function formCalc(){
+  const sym=SYMS[account.currency||'USD'];
+  const entry=+document.getElementById('f-entry').value;
+  const sl=+document.getElementById('f-sl').value;
+  const tp=+document.getElementById('f-tp').value;
+  const riskAmt=account.balance*account.riskPercent/100;
+  if(entry&&sl){ const al=calcLots(entry,sl,riskAmt); if(al) document.getElementById('f-lots').value=al; }
+  const lots=+document.getElementById('f-lots').value;
+  const rr=calcRR(entry,sl,tp);
+  const pips=entry&&sl?Math.round(Math.abs(entry-sl)/0.01):null;
+  const strip=document.getElementById('auto-strip');
+  if(entry||sl||tp||lots){
+    strip.style.display='flex';
+    document.getElementById('chip-lot').textContent=lots||'—';
+    document.getElementById('chip-lot').style.color=lots>10?'#f87171':'#e8e0d0';
+    document.getElementById('chip-rr').textContent=rr?'1:'+rr:'—';
+    document.getElementById('chip-risk').textContent=sym+riskAmt.toFixed(2);
+    document.getElementById('chip-pips').textContent=pips?pips+' pips':'—';
+  } else strip.style.display='none';
+  const wLot=document.getElementById('warn-lot');
+  wLot.style.display=lots>10?'block':'none';
+  if(lots>10) wLot.textContent='⚠ Lot size '+lots.toFixed(2)+' is very large — SL may be too tight.';
+  const wSide=document.getElementById('warn-side');
+  if(entry&&sl&&formState.direction==='Long'&&sl>entry){ wSide.style.display='block'; wSide.textContent='⚠ Long trade but SL is above entry — did you mean TP?'; }
+  else if(entry&&sl&&formState.direction==='Short'&&sl<entry){ wSide.style.display='block'; wSide.textContent='⚠ Short trade but SL is below entry — did you mean TP?'; }
+  else wSide.style.display='none';
+  const exit=getAutoExit(); if(exit) document.getElementById('f-exit').value=exit;
+  const exitVal=+document.getElementById('f-exit').value;
+  const pnl=exitVal&&formState.status!=='Open'?calcPnL(formState.direction,entry,exitVal,lots):null;
+  const pnlStrip=document.getElementById('pnl-strip');
+  if(pnl!==null){
+    pnlStrip.style.display='flex';
+    pnlStrip.className='auto-strip '+(parseFloat(pnl)>=0?'pnl-win':'pnl-loss');
+    const cp=document.getElementById('chip-pnl');
+    cp.textContent=(parseFloat(pnl)>0?'+':'')+pnl+' '+(account.currency||'USD');
+    cp.style.color=parseFloat(pnl)>=0?'#4ade80':'#f87171';
+    const rRes=riskAmt?(parseFloat(pnl)/riskAmt).toFixed(2):null;
+    document.getElementById('chip-result').textContent=rRes?(parseFloat(rRes)>0?'+':'')+rRes+'R':'';
+  } else pnlStrip.style.display='none';
+}
+
+function getAutoExit(){
+  const entry=document.getElementById('f-entry').value;
+  const sl=document.getElementById('f-sl').value;
+  const tp=document.getElementById('f-tp').value;
+  if(formState.status==='Win'&&tp) return tp;
+  if(formState.status==='Loss'&&sl) return sl;
+  if(formState.status==='Breakeven'&&entry) return entry;
+  return null;
+}
+
+function setStatus(s){
+  formState.status=s; updateStatusButtons();
+  const exit=getAutoExit();
+  if(exit){
+    document.getElementById('f-exit').value=exit;
+    const lbl=s==='Win'?'TP':s==='Loss'?'SL':'entry';
+    document.getElementById('exit-hint').textContent='↳ Exit auto-set to '+lbl+': '+exit;
+  } else {
+    if(s==='Open') document.getElementById('f-exit').value='';
+    document.getElementById('exit-hint').textContent='';
+  }
+  formCalc();
+}
+
+function updateStatusButtons(){
+  const btns=document.querySelectorAll('.status-btn');
+  ['Open','Win','Loss','Breakeven'].forEach((s,i)=>{ btns[i].className='status-btn mono'; if(s===formState.status) btns[i].classList.add(['s-open','s-win','s-loss','s-be'][i]); });
+}
+function segClick(field,val){ formState[field]=val; updateSegButtons(); formCalc(); }
+function updateSegButtons(){
+  document.querySelectorAll('#seg-mode .seg-btn').forEach((b,i)=>{ b.className='seg-btn mono'; if(['backtest','live'][i]===formState.mode) b.classList.add('active'); });
+  document.querySelectorAll('#seg-dir .seg-btn').forEach((b,i)=>{ b.className='seg-btn mono'; const d=['Long','Short'][i]; if(d===formState.direction) b.classList.add(d==='Long'?'active-long':'active-short','active'); });
+}
+function buildConfGrid(){ document.getElementById('conf-grid').innerHTML=CONFS.map(c=>`<button class="conf-btn mono" onclick="toggleConf('${c}',this)">${c}</button>`).join(''); }
+function buildEmotionGrid(){ document.getElementById('emotion-grid').innerHTML=EMOTIONS.map(e=>`<button class="conf-btn mono" onclick="setEmotion('${e}')">${e}</button>`).join(''); }
+function toggleConf(c){ if(formState.confluences.includes(c)) formState.confluences=formState.confluences.filter(x=>x!==c); else formState.confluences.push(c); updateConfButtons(); }
+function setEmotion(e){ formState.emotion=e; updateEmotionButtons(); }
+function updateConfButtons(){ document.querySelectorAll('#conf-grid .conf-btn').forEach((b,i)=>b.classList.toggle('active',formState.confluences.includes(CONFS[i]))); }
+function updateEmotionButtons(){ document.querySelectorAll('#emotion-grid .conf-btn').forEach((b,i)=>b.classList.toggle('active',EMOTIONS[i]===formState.emotion)); }
+
+async function saveTrade(){
+  const entry=document.getElementById('f-entry').value;
+  const date=document.getElementById('f-date').value;
+  if(!entry||!date){ toast('Entry price and date required'); return; }
+  document.getElementById('save-btn').textContent='SAVING...';
+  document.getElementById('save-btn').disabled=true;
+  const riskAmt=account.balance*account.riskPercent/100;
+  const sl=document.getElementById('f-sl').value,tp=document.getElementById('f-tp').value;
+  const lots=document.getElementById('f-lots').value,exit=document.getElementById('f-exit').value;
+  const pnl=exit&&formState.status!=='Open'?calcPnL(formState.direction,+entry,+exit,+lots):null;
+  const rr=calcRR(+entry,+sl,+tp);
+  const trade={
+    id: editId||Date.now(), mode:formState.mode, date, time:document.getElementById('f-time').value,
+    session:document.getElementById('f-session').value, direction:formState.direction,
+    status:formState.status, entryPrice:entry, stopLoss:sl, takeProfit:tp,
+    lotSize:lots, exitPrice:exit, exitTime:document.getElementById('f-exit-time').value,
+    setup:document.getElementById('f-setup').value, confluences:[...formState.confluences],
+    emotion:formState.emotion, rr:rr||'', pnlDollars:pnl!==null?pnl:'',
+    riskDollars:riskAmt.toFixed(2), currency:account.currency||'USD',
+    notes:document.getElementById('f-notes').value, screenshot:document.getElementById('f-ss').value,
+  };
+  let ok;
+  if(editId!==null){ ok=await dbUpdate(trade); if(ok) trades=trades.map(t=>t.id===editId?trade:t); }
+  else { ok=await dbInsert(trade); if(ok) trades.unshift(trade); }
+  document.getElementById('save-btn').disabled=false;
+  if(ok){
+    editId=null; showView('journal',null); renderJournal(); updateHeader();
+    toast(editId?'Trade updated ✓':'Trade saved ✓');
+  } else {
+    document.getElementById('save-btn').textContent=editId?'UPDATE TRADE':'SAVE TRADE';
+  }
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function renderStats(){
+  const sym=SYMS[account.currency||'USD'];
+  const closed=trades.filter(t=>t.status!=='Open'&&t.pnlDollars!=='');
+  const totalPnL=closed.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0);
+  const wins=closed.filter(t=>parseFloat(t.pnlDollars)>0).length;
+  const losses=closed.filter(t=>parseFloat(t.pnlDollars)<0).length;
+  const winRate=closed.length?((wins/closed.length)*100).toFixed(1):'—';
+  const avgRR=closed.filter(t=>t.rr).length?(closed.reduce((s,t)=>s+parseFloat(t.rr||0),0)/closed.filter(t=>t.rr).length).toFixed(2):'—';
+  const riskAmt=(account.balance*account.riskPercent/100).toFixed(2);
+  const curBal=(account.balance+totalPnL).toFixed(2);
+  const sc=(lbl,val,color)=>`<div class="stat-card"><div class="stat-lbl mono">${lbl}</div><div class="stat-val mono" style="color:${color||'#e2c87b'}">${val}</div></div>`;
+  let equitySVG='';
+  if(closed.length>1){
+    const sorted=[...closed].sort((a,b)=>new Date(a.date+' '+(a.time||'00:00'))-new Date(b.date+' '+(b.time||'00:00')));
+    let bal=account.balance;
+    const pts=sorted.map(t=>{bal+=parseFloat(t.pnlDollars||0);return bal;});
+    const mn=Math.min(...pts),mx=Math.max(...pts),rng=mx-mn||1,H=80;
+    const svgPts=pts.map((p,i)=>`${(i/(pts.length-1))*100},${H-((p-mn)/rng)*H}`).join(' ');
+    const last=pts[pts.length-1],col=last>=account.balance?'#4ade80':'#f87171';
+    equitySVG=`<div class="section"><div class="sec-lbl mono">EQUITY CURVE</div><div class="equity-box"><svg viewBox="0 0 100 ${H}" style="width:100%;height:80px" preserveAspectRatio="none"><polyline points="${svgPts}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg><div class="equity-meta"><span class="eq-start mono">${sym}${account.balance.toLocaleString()}</span><span class="eq-end mono" style="color:${col}">${sym}${last.toLocaleString()}</span></div></div></div>`;
+  }
+  const byGroup=(key)=>{
+    const g={};
+    closed.forEach(t=>{const k=t[key]||'Untagged';if(!g[k])g[k]={count:0,pnl:0,wins:0};g[k].count++;g[k].pnl+=parseFloat(t.pnlDollars||0);if(parseFloat(t.pnlDollars)>0)g[k].wins++;});
+    return Object.entries(g).sort((a,b)=>b[1].pnl-a[1].pnl).map(([s,d])=>`<div class="setup-row"><span class="setup-name mono">${s}</span><span class="setup-cnt mono">${d.count} trades</span><span class="setup-wr mono">${((d.wins/d.count)*100).toFixed(0)}% WR</span><span class="setup-pnl mono" style="color:${d.pnl>=0?'#4ade80':'#f87171'}">${d.pnl>=0?'+':''}${sym}${d.pnl.toFixed(2)}</span></div>`).join('');
+  };
+  document.getElementById('stats-content').innerHTML=`
+    <div class="stats-title mono">PERFORMANCE ANALYTICS</div>
+    <div class="stats-grid">
+      ${sc('BALANCE ('+account.currency+')',sym+parseFloat(curBal).toLocaleString(),totalPnL>=0?'#4ade80':'#f87171')}
+      ${sc('TOTAL P&L',(totalPnL>=0?'+':'')+sym+totalPnL.toFixed(2),totalPnL>=0?'#4ade80':'#f87171')}
+      ${sc('WIN RATE',winRate+'%')}${sc('AVG R:R',avgRR!=='—'?'1:'+avgRR:'—','#a78bfa')}
+      ${sc('WINS',wins,'#4ade80')}${sc('LOSSES',losses,'#f87171')}
+      ${sc('TOTAL TRADES',trades.length)}${sc('RISK/TRADE',sym+riskAmt,'#e2c87b')}
+    </div>
+    ${equitySVG}
+    ${closed.length?`<div class="section"><div class="sec-lbl mono">P&L BY SETUP</div>${byGroup('setup')}</div><div class="section"><div class="sec-lbl mono">P&L BY EMOTION</div>${byGroup('emotion')}</div>`:''}
+    <div class="section"><div class="sec-lbl mono">EXPORT</div><button class="export-btn mono" onclick="exportCSV()">EXPORT CSV</button></div>`;
+}
+
+function exportCSV(){
+  const rows=[["Date","Time","Mode","Direction","Session","Setup","Entry","SL","TP","ExitPrice","ExitTime","Lots","Risk","RR","PnL","Status","Emotion","Notes"].join(','),
+    ...trades.map(t=>[t.date,t.time,t.mode,t.direction,t.session,t.setup,t.entryPrice,t.stopLoss,t.takeProfit,t.exitPrice,t.exitTime,t.lotSize,t.riskDollars,t.rr,t.pnlDollars,t.status,t.emotion,'"'+(t.notes||'').replace(/"/g,'""')+'"'].join(','))].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows],{type:'text/csv'}));a.download='xauusd_journal.csv';a.click();
+}
+
+// ─── HEADER ───────────────────────────────────────────────────────────────────
+function updateHeader(){
+  const sym=SYMS[account.currency||'USD'];
+  const closed=trades.filter(t=>t.status!=='Open'&&t.pnlDollars!=='');
+  const totalPnL=closed.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0);
+  const curBal=account.balance+totalPnL;
+  const el=document.getElementById('hdr-bal');
+  el.textContent=sym+curBal.toLocaleString();
+  el.style.color=totalPnL>=0?'#4ade80':'#f87171';
+  document.getElementById('hdr-risk').textContent=sym+(account.balance*account.riskPercent/100).toFixed(2)+' ('+account.riskPercent+'%)';
+}
+function updateRiskBanner(){
+  const sym=SYMS[account.currency||'USD'];
+  const r=(account.balance*account.riskPercent/100).toFixed(2);
+  document.getElementById('risk-banner-txt').textContent=sym+r+' ('+account.riskPercent+'% of '+sym+account.balance.toLocaleString()+')';
+}
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────────────
+function openSettings(){ syncSettingsModal(); document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
+function syncSettingsModal(){
+  document.getElementById('s-balance').value=account.balance;
+  document.getElementById('s-risk').value=account.riskPercent;
+  document.querySelectorAll('.curr-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes(account.currency||'USD')));
+  document.querySelectorAll('.risk-pill').forEach(b=>b.classList.toggle('active',parseFloat(b.textContent)===account.riskPercent));
+  document.getElementById('bal-field-lbl').textContent='ACCOUNT BALANCE ('+(account.currency||'USD')+')';
+  document.getElementById('bal-prefix').textContent=SYMS[account.currency||'USD'];
+  updateRiskPreview();
+}
+function setCurrency(c,btn){ account.currency=c; document.querySelectorAll('.curr-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); document.getElementById('bal-field-lbl').textContent='ACCOUNT BALANCE ('+c+')'; document.getElementById('bal-prefix').textContent=SYMS[c]; updateRiskPreview(); }
+function setRiskPct(v,btn){ document.getElementById('s-risk').value=v; document.querySelectorAll('.risk-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); updateRiskPreview(); }
+function syncRiskPills(){ const v=parseFloat(document.getElementById('s-risk').value); document.querySelectorAll('.risk-pill').forEach(b=>b.classList.toggle('active',parseFloat(b.textContent)===v)); }
+function updateRiskPreview(){ const sym=SYMS[account.currency||'USD'],bal=parseFloat(document.getElementById('s-balance').value)||0,rp=parseFloat(document.getElementById('s-risk').value)||0; document.getElementById('risk-preview').innerHTML='Risk per trade: <strong style="color:#e2c87b">'+sym+(bal*rp/100).toFixed(2)+' '+(account.currency||'USD')+'</strong>'; }
+function saveSettings(){ account.balance=parseFloat(document.getElementById('s-balance').value)||10000; account.riskPercent=parseFloat(document.getElementById('s-risk').value)||1; saveAccount(); updateHeader(); updateRiskBanner(); formCalc(); closeSettings(); toast('Settings saved ✓'); }
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2800); }
+</script>
 </body>
 </html>
