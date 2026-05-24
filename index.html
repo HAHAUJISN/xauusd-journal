@@ -146,6 +146,12 @@ input.lot-inp{color:#a78bfa}
 .setup-cnt{font-size:9px;color:#555}
 .setup-wr{font-size:9px;color:#a78bfa}
 .setup-pnl{font-size:11px;font-weight:700;min-width:80px;text-align:right}
+.session-row{padding:10px 0;border-bottom:1px solid #1a1a1f}
+.session-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.sess-wr-pct{font-size:16px}
+.sess-bar-bg{background:#1e1e28;border-radius:20px;height:5px;margin-bottom:6px;overflow:hidden}
+.sess-bar-fill{height:100%;border-radius:20px;transition:width .3s}
+.sess-meta{display:flex;gap:12px;font-size:9px;color:#555;flex-wrap:wrap}
 .export-btn{padding:8px 18px;background:none;border:1px solid #2a2a32;color:#666;font-size:10px;cursor:pointer;border-radius:4px}
 .modal-overlay{display:none;position:fixed;inset:0;background:#000000bb;z-index:100;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.open{display:flex}
@@ -739,40 +745,192 @@ async function saveTrade(){
 function renderStats(){
   const sym=SYMS[account.currency||'USD'];
   const closed=trades.filter(t=>t.status!=='Open'&&t.pnlDollars!=='');
+  const open=trades.filter(t=>t.status==='Open');
+  if(!closed.length){
+    document.getElementById('stats-content').innerHTML=`<div class="empty"><div class="empty-icon">◈</div><div>No closed trades yet</div><div style="font-size:11px;color:#444;margin-top:8px">Close some trades to see analytics</div></div>`;
+    return;
+  }
   const totalPnL=closed.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0);
-  const wins=closed.filter(t=>parseFloat(t.pnlDollars)>0).length;
-  const losses=closed.filter(t=>parseFloat(t.pnlDollars)<0).length;
-  const winRate=closed.length?((wins/closed.length)*100).toFixed(1):'—';
-  const avgRR=closed.filter(t=>t.rr).length?(closed.reduce((s,t)=>s+parseFloat(t.rr||0),0)/closed.filter(t=>t.rr).length).toFixed(2):'—';
+  const wins=closed.filter(t=>parseFloat(t.pnlDollars)>0);
+  const losses=closed.filter(t=>parseFloat(t.pnlDollars)<0);
+  const bes=closed.filter(t=>parseFloat(t.pnlDollars)===0);
+  const winRate=((wins.length/closed.length)*100).toFixed(1);
+  const longs=closed.filter(t=>t.direction==='Long');
+  const shorts=closed.filter(t=>t.direction==='Short');
+  const longWR=longs.length?((longs.filter(t=>parseFloat(t.pnlDollars)>0).length/longs.length)*100).toFixed(0):'—';
+  const shortWR=shorts.length?((shorts.filter(t=>parseFloat(t.pnlDollars)>0).length/shorts.length)*100).toFixed(0):'—';
   const riskAmt=(account.balance*account.riskPercent/100).toFixed(2);
   const curBal=(account.balance+totalPnL).toFixed(2);
-  const sc=(lbl,val,color)=>`<div class="stat-card"><div class="stat-lbl mono">${lbl}</div><div class="stat-val mono" style="color:${color||'#e2c87b'}">${val}</div></div>`;
+  const avgWin=wins.length?(wins.reduce((s,t)=>s+parseFloat(t.pnlDollars),0)/wins.length).toFixed(2):0;
+  const avgLoss=losses.length?(losses.reduce((s,t)=>s+parseFloat(t.pnlDollars),0)/losses.length).toFixed(2):0;
+  const avgRRArr=closed.filter(t=>t.rr).map(t=>parseFloat(t.rr));
+  const avgRR=avgRRArr.length?(avgRRArr.reduce((a,b)=>a+b,0)/avgRRArr.length).toFixed(2):'—';
+  const profitFactor=losses.length&&Math.abs(avgLoss)>0?(Math.abs(wins.reduce((s,t)=>s+parseFloat(t.pnlDollars),0))/Math.abs(losses.reduce((s,t)=>s+parseFloat(t.pnlDollars),0))).toFixed(2):'—';
+  // streak
+  const sorted=[...closed].sort((a,b)=>new Date(a.date+' '+(a.time||'00:00'))-new Date(b.date+' '+(b.time||'00:00')));
+  let curStreak=0,bestWin=0,bestLoss=0,curType='';
+  sorted.forEach(t=>{ const w=parseFloat(t.pnlDollars)>0; if(w){ if(curType==='w'){curStreak++;}else{curStreak=1;curType='w';} bestWin=Math.max(bestWin,curStreak); }else{ if(curType==='l'){curStreak++;}else{curStreak=1;curType='l';} bestLoss=Math.max(bestLoss,curStreak); } });
+  const lastStreak=curType==='w'?`+${curStreak}W streak`:`${curStreak}L streak`;
+  const sc=(lbl,val,color,sub)=>`<div class="stat-card"><div class="stat-lbl mono">${lbl}</div><div class="stat-val mono" style="color:${color||'#e2c87b'}">${val}</div>${sub?`<div style="font-size:9px;color:#555;margin-top:3px">${sub}</div>`:''}</div>`;
+
+  // ── EQUITY CURVE SVG ──
   let equitySVG='';
-  if(closed.length>1){
-    const sorted=[...closed].sort((a,b)=>new Date(a.date+' '+(a.time||'00:00'))-new Date(b.date+' '+(b.time||'00:00')));
+  if(sorted.length>1){
     let bal=account.balance;
     const pts=sorted.map(t=>{bal+=parseFloat(t.pnlDollars||0);return bal;});
-    const mn=Math.min(...pts),mx=Math.max(...pts),rng=mx-mn||1,H=80;
+    const mn=Math.min(account.balance,...pts),mx=Math.max(account.balance,...pts),rng=mx-mn||1,H=100;
     const svgPts=pts.map((p,i)=>`${(i/(pts.length-1))*100},${H-((p-mn)/rng)*H}`).join(' ');
+    const startY=H-((account.balance-mn)/rng)*H;
     const last=pts[pts.length-1],col=last>=account.balance?'#4ade80':'#f87171';
-    equitySVG=`<div class="section"><div class="sec-lbl mono">EQUITY CURVE</div><div class="equity-box"><svg viewBox="0 0 100 ${H}" style="width:100%;height:80px" preserveAspectRatio="none"><polyline points="${svgPts}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg><div class="equity-meta"><span class="eq-start mono">${sym}${account.balance.toLocaleString()}</span><span class="eq-end mono" style="color:${col}">${sym}${last.toLocaleString()}</span></div></div></div>`;
+    // drawdown
+    let peak=account.balance,maxDD=0;
+    pts.forEach(p=>{peak=Math.max(peak,p);maxDD=Math.max(maxDD,peak-p);});
+    const ddPct=((maxDD/account.balance)*100).toFixed(1);
+    equitySVG=`<div class="section"><div class="sec-lbl mono">EQUITY CURVE</div>
+      <div class="equity-box" style="padding:16px">
+        <svg viewBox="0 0 100 ${H}" style="width:100%;height:120px" preserveAspectRatio="none">
+          <line x1="0" y1="${startY}" x2="100" y2="${startY}" stroke="#2a2a32" stroke-width="0.5" vector-effect="non-scaling-stroke" stroke-dasharray="2,2"/>
+          <polyline points="${svgPts}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+          ${pts.map((p,i)=>i===pts.length-1?`<circle cx="${(i/(pts.length-1))*100}" cy="${H-((p-mn)/rng)*H}" r="2" fill="${col}" vector-effect="non-scaling-stroke"/>`:'').join('')}
+        </svg>
+        <div class="equity-meta" style="margin-top:10px">
+          <span class="eq-start mono">${sym}${account.balance.toLocaleString()}</span>
+          <span style="font-size:9px;color:#555" class="mono">Max DD: <span style="color:#f87171">${ddPct}%</span></span>
+          <span class="eq-end mono" style="color:${col}">${sym}${last.toLocaleString()}</span>
+        </div>
+      </div></div>`;
   }
-  const byGroup=(key)=>{
+
+  // ── WIN/LOSS DISTRIBUTION BAR ──
+  const totalTrades=closed.length;
+  const wPct=(wins.length/totalTrades*100).toFixed(0);
+  const lPct=(losses.length/totalTrades*100).toFixed(0);
+  const bePct=(bes.length/totalTrades*100).toFixed(0);
+  const distBar=`<div class="section"><div class="sec-lbl mono">TRADE DISTRIBUTION</div>
+    <div style="border-radius:6px;overflow:hidden;height:28px;display:flex;margin-bottom:8px">
+      <div style="width:${wPct}%;background:#4ade8044;display:flex;align-items:center;justify-content:center;font-size:10px;color:#4ade80;font-family:'Space Mono',monospace;font-weight:700">${wins.length>0?wins.length+'W':''}</div>
+      <div style="width:${bePct}%;background:#60a5fa22;display:flex;align-items:center;justify-content:center;font-size:10px;color:#60a5fa;font-family:'Space Mono',monospace">${bes.length>0?bes.length+'BE':''}</div>
+      <div style="width:${lPct}%;background:#f8717133;display:flex;align-items:center;justify-content:center;font-size:10px;color:#f87171;font-family:'Space Mono',monospace;font-weight:700">${losses.length>0?losses.length+'L':''}</div>
+    </div>
+    <div style="display:flex;gap:16px;font-size:9px;font-family:'Space Mono',monospace">
+      <span style="color:#4ade80">${wPct}% wins</span>
+      ${bes.length?`<span style="color:#60a5fa">${bePct}% BE</span>`:''}
+      <span style="color:#f87171">${lPct}% losses</span>
+      <span style="color:#a78bfa;margin-left:auto">PF: ${profitFactor}</span>
+    </div></div>`;
+
+  // ── LONG VS SHORT ──
+  const dirBar=`<div class="section"><div class="sec-lbl mono">LONG vs SHORT</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:#4ade8012;border:1px solid #4ade8030;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#4ade80;font-family:'Space Mono',monospace">${longWR}%</div>
+        <div style="font-size:8px;color:#555;letter-spacing:.15em;margin:4px 0">LONG WIN RATE</div>
+        <div style="font-size:9px;color:#666;font-family:'Space Mono',monospace">${longs.length} trades</div>
+        <div style="font-size:10px;color:${longs.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0)>=0?'#4ade80':'#f87171'};font-family:'Space Mono',monospace;margin-top:4px">${sym}${longs.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0).toFixed(2)}</div>
+      </div>
+      <div style="background:#f8717112;border:1px solid #f8717130;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#f87171;font-family:'Space Mono',monospace">${shortWR}%</div>
+        <div style="font-size:8px;color:#555;letter-spacing:.15em;margin:4px 0">SHORT WIN RATE</div>
+        <div style="font-size:9px;color:#666;font-family:'Space Mono',monospace">${shorts.length} trades</div>
+        <div style="font-size:10px;color:${shorts.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0)>=0?'#4ade80':'#f87171'};font-family:'Space Mono',monospace;margin-top:4px">${sym}${shorts.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0).toFixed(2)}</div>
+      </div>
+    </div></div>`;
+
+  // ── PNL HISTOGRAM (bar chart by trade) ──
+  let histHTML='';
+  if(sorted.length>0){
+    const maxAbs=Math.max(...sorted.map(t=>Math.abs(parseFloat(t.pnlDollars||0))),1);
+    const bars=sorted.map((t,i)=>{
+      const p=parseFloat(t.pnlDollars||0);
+      const h=Math.max(2,(Math.abs(p)/maxAbs)*60);
+      const col=p>0?'#4ade80':p<0?'#f87171':'#60a5fa';
+      return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:60px;flex:1;min-width:4px;max-width:20px" title="${t.date} ${p>0?'+':''}${p} ${sym}">
+        <div style="width:100%;height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:.8"></div>
+      </div>`;
+    }).join('');
+    histHTML=`<div class="section"><div class="sec-lbl mono">P&L PER TRADE</div>
+      <div style="background:#111115;border:1px solid #1e1e28;border-radius:6px;padding:12px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:60px;overflow-x:auto">${bars}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:#444;font-family:'Space Mono',monospace">
+          <span>#1</span><span>#${sorted.length}</span>
+        </div>
+      </div></div>`;
+  }
+
+  // ── SESSION ──
+  const sessionHTML=()=>{
     const g={};
-    closed.forEach(t=>{const k=t[key]||'Untagged';if(!g[k])g[k]={count:0,pnl:0,wins:0};g[k].count++;g[k].pnl+=parseFloat(t.pnlDollars||0);if(parseFloat(t.pnlDollars)>0)g[k].wins++;});
-    return Object.entries(g).sort((a,b)=>b[1].pnl-a[1].pnl).map(([s,d])=>`<div class="setup-row"><span class="setup-name mono">${s}</span><span class="setup-cnt mono">${d.count} trades</span><span class="setup-wr mono">${((d.wins/d.count)*100).toFixed(0)}% WR</span><span class="setup-pnl mono" style="color:${d.pnl>=0?'#4ade80':'#f87171'}">${d.pnl>=0?'+':''}${sym}${d.pnl.toFixed(2)}</span></div>`).join('');
+    closed.forEach(t=>{const s=t.session||'Unknown';if(!g[s])g[s]={count:0,wins:0,losses:0,pnl:0,rr:[]};g[s].count++;g[s].pnl+=parseFloat(t.pnlDollars||0);if(parseFloat(t.pnlDollars)>0)g[s].wins++;else if(parseFloat(t.pnlDollars)<0)g[s].losses++;if(t.rr)g[s].rr.push(parseFloat(t.rr));});
+    return Object.entries(g).sort((a,b)=>b[1].count-a[1].count).map(([s,d])=>{
+      const wr=((d.wins/d.count)*100).toFixed(0);
+      const avgRR=d.rr.length?(d.rr.reduce((a,b)=>a+b,0)/d.rr.length).toFixed(2):null;
+      const col=wr>=60?'#4ade80':wr>=45?'#e2c87b':'#f87171';
+      return `<div class="session-row">
+        <div class="session-top"><span class="setup-name mono">${s}</span><span style="color:${col};font-weight:700;font-family:'Space Mono',monospace;font-size:16px">${wr}%</span></div>
+        <div class="sess-bar-bg"><div class="sess-bar-fill" style="width:${wr}%;background:${col}"></div></div>
+        <div class="sess-meta mono"><span>${d.count} trades</span><span style="color:#4ade80">${d.wins}W</span><span style="color:#f87171">${d.losses}L</span>${d.count-d.wins-d.losses>0?`<span style="color:#60a5fa">${d.count-d.wins-d.losses}BE</span>`:''} ${avgRR?`<span style="color:#a78bfa">avg 1:${avgRR}R</span>`:''}<span style="color:${d.pnl>=0?'#4ade80':'#f87171'}">${d.pnl>=0?'+':''}${sym}${d.pnl.toFixed(2)}</span></div>
+      </div>`;
+    }).join('');
   };
+
+  // ── BY GROUP helper ──
+  const byGroup=(key,label)=>{
+    const g={};
+    closed.forEach(t=>{const k=t[key]||'Untagged';if(!g[k])g[k]={count:0,pnl:0,wins:0,rr:[]};g[k].count++;g[k].pnl+=parseFloat(t.pnlDollars||0);if(parseFloat(t.pnlDollars)>0)g[k].wins++;if(t.rr)g[k].rr.push(parseFloat(t.rr));});
+    return `<div class="section"><div class="sec-lbl mono">${label}</div>`+
+      Object.entries(g).sort((a,b)=>b[1].pnl-a[1].pnl).map(([s,d])=>{
+        const wr=((d.wins/d.count)*100).toFixed(0);
+        const avgRR=d.rr.length?(d.rr.reduce((a,b)=>a+b,0)/d.rr.length).toFixed(2):null;
+        return `<div class="setup-row">
+          <span class="setup-name mono">${s}</span>
+          <span class="setup-cnt mono">${d.count}x</span>
+          <span class="setup-wr mono">${wr}% WR</span>
+          ${avgRR?`<span style="font-size:9px;color:#a78bfa;font-family:'Space Mono',monospace">1:${avgRR}R</span>`:''}
+          <span class="setup-pnl mono" style="color:${d.pnl>=0?'#4ade80':'#f87171'}">${d.pnl>=0?'+':''}${sym}${d.pnl.toFixed(2)}</span>
+        </div>`;
+      }).join('')+'</div>';
+  };
+
+  // ── DAY OF WEEK ──
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const byDay={};
+  closed.forEach(t=>{if(!t.date)return;const d=new Date(t.date).getDay();const k=days[d];if(!byDay[k])byDay[k]={count:0,wins:0,pnl:0};byDay[k].count++;byDay[k].pnl+=parseFloat(t.pnlDollars||0);if(parseFloat(t.pnlDollars)>0)byDay[k].wins++;});
+  const dayHTML=Object.keys(byDay).length?`<div class="section"><div class="sec-lbl mono">P&L BY DAY OF WEEK</div>`+
+    days.filter(d=>byDay[d]).map(d=>{
+      const g=byDay[d];const wr=((g.wins/g.count)*100).toFixed(0);const col=wr>=60?'#4ade80':wr>=45?'#e2c87b':'#f87171';
+      return `<div class="setup-row"><span class="setup-name mono">${d}</span><span class="setup-cnt mono">${g.count} trades</span><span class="setup-wr mono" style="color:${col}">${wr}% WR</span><span class="setup-pnl mono" style="color:${g.pnl>=0?'#4ade80':'#f87171'}">${g.pnl>=0?'+':''}${sym}${g.pnl.toFixed(2)}</span></div>`;
+    }).join('')+'</div>':'' ;
+
+  // ── CONFLUENCE WIN RATE ──
+  const confStats={};
+  closed.forEach(t=>{(t.confluences||[]).forEach(c=>{if(!confStats[c])confStats[c]={count:0,wins:0};confStats[c].count++;if(parseFloat(t.pnlDollars)>0)confStats[c].wins++;});});
+  const confHTML=Object.keys(confStats).length?`<div class="section"><div class="sec-lbl mono">WIN RATE BY CONFLUENCE</div>`+
+    Object.entries(confStats).sort((a,b)=>(b[1].wins/b[1].count)-(a[1].wins/a[1].count)).map(([c,d])=>{
+      const wr=((d.wins/d.count)*100).toFixed(0);const col=wr>=60?'#4ade80':wr>=45?'#e2c87b':'#f87171';
+      return `<div class="setup-row"><span class="setup-name mono">${c}</span><span class="setup-cnt mono">${d.count}x</span><div style="flex:1;background:#1e1e28;border-radius:10px;height:4px;margin:0 8px"><div style="width:${wr}%;background:${col};height:100%;border-radius:10px"></div></div><span style="font-size:10px;color:${col};font-family:'Space Mono',monospace;font-weight:700;min-width:36px;text-align:right">${wr}%</span></div>`;
+    }).join('')+'</div>':'';
+
   document.getElementById('stats-content').innerHTML=`
     <div class="stats-title mono">PERFORMANCE ANALYTICS</div>
     <div class="stats-grid">
-      ${sc('BALANCE ('+account.currency+')',sym+parseFloat(curBal).toLocaleString(),totalPnL>=0?'#4ade80':'#f87171')}
+      ${sc('BALANCE',sym+parseFloat(curBal).toLocaleString(),totalPnL>=0?'#4ade80':'#f87171')}
       ${sc('TOTAL P&L',(totalPnL>=0?'+':'')+sym+totalPnL.toFixed(2),totalPnL>=0?'#4ade80':'#f87171')}
-      ${sc('WIN RATE',winRate+'%')}${sc('AVG R:R',avgRR!=='—'?'1:'+avgRR:'—','#a78bfa')}
-      ${sc('WINS',wins,'#4ade80')}${sc('LOSSES',losses,'#f87171')}
-      ${sc('TOTAL TRADES',trades.length)}${sc('RISK/TRADE',sym+riskAmt,'#e2c87b')}
+      ${sc('WIN RATE',winRate+'%',winRate>=50?'#4ade80':'#f87171')}
+      ${sc('AVG R:R',avgRR!=='—'?'1:'+avgRR:'—','#a78bfa')}
+      ${sc('AVG WIN',sym+avgWin,'#4ade80')}
+      ${sc('AVG LOSS',sym+avgLoss,'#f87171')}
+      ${sc('PROFIT FACTOR',profitFactor,'#e2c87b')}
+      ${sc('STREAK',lastStreak,curType==='w'?'#4ade80':'#f87171',`Best: ${bestWin}W / ${bestLoss}L`)}
     </div>
     ${equitySVG}
-    ${closed.length?`<div class="section"><div class="sec-lbl mono">P&L BY SETUP</div>${byGroup('setup')}</div><div class="section"><div class="sec-lbl mono">P&L BY EMOTION</div>${byGroup('emotion')}</div>`:''}
+    ${distBar}
+    ${histHTML}
+    ${dirBar}
+    <div class="section"><div class="sec-lbl mono">WIN RATE BY SESSION</div>${sessionHTML()}</div>
+    ${byGroup('setup','P&L BY SETUP')}
+    ${byGroup('emotion','P&L BY EMOTION')}
+    ${dayHTML}
+    ${confHTML}
     <div class="section"><div class="sec-lbl mono">EXPORT</div><button class="export-btn mono" onclick="exportCSV()">EXPORT CSV</button></div>`;
 }
 
