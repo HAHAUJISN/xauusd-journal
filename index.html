@@ -226,6 +226,17 @@ input.lot-inp{color:#a78bfa}
       <span class="trade-count mono" id="trade-count">0 TRADES</span>
       <button class="log-btn mono" onclick="showView('add',null);newTrade()">+ LOG TRADE</button>
     </div>
+    <div class="filter-row" style="margin-top:-8px;margin-bottom:14px">
+      <div class="filter-grp">
+        <span class="filter-lbl mono">SESSION</span>
+        <button class="pill mono active" onclick="setFilter('session','All',this)">ALL</button>
+        <button class="pill mono" onclick="setFilter('session','London',this)">LON</button>
+        <button class="pill mono" onclick="setFilter('session','New York',this)">NY</button>
+        <button class="pill mono" onclick="setFilter('session','London/NY Overlap',this)">OVERLAP</button>
+        <button class="pill mono" onclick="setFilter('session','Tokyo',this)">TYO</button>
+        <button class="pill mono" onclick="setFilter('session','Sydney',this)">SYD</button>
+      </div>
+    </div>
     <div id="trade-list"><div class="loading mono">Loading trades...</div></div>
   </div>
 
@@ -363,7 +374,7 @@ const EMOTIONS = ["Disciplined","Confident","Neutral","Anxious","FOMO","Revenge"
 let trades = [];
 let account = { balance:10000, riskPercent:1, currency:'USD' };
 let editId = null;
-let filterMode = 'All', filterDir = 'All';
+let filterMode = 'All', filterDir = 'All', filterSession = 'All';
 let formState = { mode:'backtest', direction:'Long', status:'Open', confluences:[], emotion:'Neutral' };
 
 // ─── SUPABASE API ─────────────────────────────────────────────────────────────
@@ -496,14 +507,18 @@ function showView(name, navBtn){
 
 // ─── JOURNAL ──────────────────────────────────────────────────────────────────
 function setFilter(type,val,btn){
-  if(type==='mode'){ filterMode=val; document.querySelectorAll('.filter-grp:first-child .pill').forEach(b=>b.classList.remove('active')); }
-  else { filterDir=val; document.querySelectorAll('.filter-grp:last-of-type .pill').forEach(b=>b.classList.remove('active')); }
-  btn.classList.add('active'); renderJournal();
+  if(type==='mode'){ filterMode=val; }
+  else if(type==='dir'){ filterDir=val; }
+  else if(type==='session'){ filterSession=val; }
+  // deactivate siblings
+  btn.parentElement.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderJournal();
 }
 
 function renderJournal(){
   const sym=SYMS[account.currency||'USD'];
-  const filtered=trades.filter(t=>(filterMode==='All'||t.mode===filterMode)&&(filterDir==='All'||t.direction===filterDir));
+  const filtered=trades.filter(t=>(filterMode==='All'||t.mode===filterMode)&&(filterDir==='All'||t.direction===filterDir)&&(filterSession==='All'||t.session===filterSession));
   document.getElementById('trade-count').textContent=filtered.length+' TRADES';
   const list=document.getElementById('trade-list');
   if(!filtered.length){
@@ -633,6 +648,16 @@ function formCalc(){
   const sl=+document.getElementById('f-sl').value;
   const tp=+document.getElementById('f-tp').value;
   const riskAmt=account.balance*account.riskPercent/100;
+
+  // ── Auto-detect direction from entry vs SL ──
+  if(entry && sl && sl !== entry){
+    const autoDir = sl < entry ? 'Long' : 'Short';
+    if(autoDir !== formState.direction){
+      formState.direction = autoDir;
+      updateSegButtons();
+    }
+  }
+
   if(entry&&sl){ const al=calcLots(entry,sl,riskAmt); if(al) document.getElementById('f-lots').value=al; }
   const lots=+document.getElementById('f-lots').value;
   const rr=calcRR(entry,sl,tp);
