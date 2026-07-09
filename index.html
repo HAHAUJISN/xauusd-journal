@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>XAU/USD Journal</title>
+<title>FX Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>body{font-family:'Syne',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.mono{font-family:'Space Mono','Courier New',monospace}</style>
 <style>
@@ -17,6 +17,9 @@ select option{background:#1a1a1f}
 header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #1e1e24;background:#0d0d10;flex-wrap:wrap;gap:10px}
 .h-left{display:flex;align-items:center;gap:12px}
 .logo{font-size:26px;color:#e2c87b}
+.pair-selector{display:flex;gap:4px;margin-left:8px;background:#0d0d10;border:1px solid #2a2a32;border-radius:6px;padding:3px}
+.pair-btn{padding:5px 10px;background:none;border:none;border-radius:4px;color:#555;font-size:10px;letter-spacing:.08em;cursor:pointer;transition:all .15s;white-space:nowrap}
+.pair-btn.active{background:#e2c87b;color:#0a0a0c;font-weight:700}
 .app-title{font-size:18px;font-weight:800;letter-spacing:.04em}
 .app-sub{font-size:9px;letter-spacing:.2em;color:#555}
 .h-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -180,8 +183,13 @@ input.lot-inp{color:#a78bfa}
   <div class="h-left">
     <span class="logo">⬡</span>
     <div>
-      <div class="app-title">XAU/USD Journal</div>
+      <div class="app-title">FX Journal</div>
       <div class="app-sub mono">Trade Intelligence System</div>
+    </div>
+    <div class="pair-selector">
+      <button class="pair-btn mono active" id="pair-GBPUSD" onclick="switchPair('GBPUSD',this)">GBP/USD</button>
+      <button class="pair-btn mono" id="pair-EURUSD" onclick="switchPair('EURUSD',this)">EUR/USD</button>
+      <button class="pair-btn mono" id="pair-XAUUSD" onclick="switchPair('XAUUSD',this)">XAU/USD</button>
     </div>
   </div>
   <div class="h-right">
@@ -325,7 +333,72 @@ input.lot-inp{color:#a78bfa}
 
   <div id="view-detail" class="view"><div class="detail-wrap" id="detail-content"></div></div>
   <div id="view-stats" class="view"><div class="stats-wrap" id="stats-content"></div></div>
+
 </main>
+
+<!-- QUICK LOG MODAL -->
+<div class="modal-overlay" id="quick-modal" onclick="closeQuickModal(event)">
+  <div class="modal" style="max-width:480px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div class="modal-title mono" style="margin-bottom:0">QUICK LOG</div>
+      <button onclick="document.getElementById('quick-modal').classList.remove('open')" style="background:none;border:none;color:#555;font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:10px;color:#555;font-family:'Space Mono',monospace;margin-bottom:16px">Fast entry — edit the trade later to add more detail</div>
+
+    <div class="field">
+      <div class="field-label mono">MODE</div>
+      <div class="seg-wrap" id="q-seg-mode">
+        <button class="seg-btn mono active" onclick="qSegClick('mode','backtest',this)">BACKTEST</button>
+        <button class="seg-btn mono" onclick="qSegClick('mode','live',this)">LIVE</button>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field"><div class="field-label mono">DATE</div><input type="date" id="q-date"></div>
+      <div class="field"><div class="field-label mono">ENTRY TIME (GMT)</div><input type="time" id="q-time" oninput="qTimeChange()"></div>
+      <div class="field"><div class="field-label mono">SESSION (AUTO)</div>
+        <select id="q-session"><option>Sydney</option><option>Tokyo</option><option selected>London</option><option>New York</option><option>London/NY Overlap</option></select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field"><div class="field-label mono">ENTRY PRICE *</div><input type="number" step="0.01" id="q-entry" placeholder="2345.00" oninput="qCalc()"></div>
+      <div class="field"><div class="field-label mono">STOP LOSS</div><input type="number" step="0.01" id="q-sl" class="sl-inp" placeholder="2335.00" oninput="qCalc()"></div>
+      <div class="field"><div class="field-label mono">TAKE PROFIT</div><input type="number" step="0.01" id="q-tp" class="tp-inp" placeholder="2365.00" oninput="qCalc()"></div>
+    </div>
+
+    <div id="q-auto-strip" style="display:none" class="auto-strip">
+      <div class="chip"><span class="chip-lbl mono">DIRECTION</span><span class="chip-val mono" id="q-chip-dir"></span></div>
+      <div class="chip"><span class="chip-lbl mono">LOT SIZE</span><span class="chip-val purple mono" id="q-chip-lot"></span></div>
+      <div class="chip"><span class="chip-lbl mono">R:R</span><span class="chip-val purple mono" id="q-chip-rr"></span></div>
+      <div class="chip"><span class="chip-lbl mono">RISK</span><span class="chip-val red mono" id="q-chip-risk"></span></div>
+    </div>
+
+    <div class="field" id="q-checklist-wrap" style="display:none">
+      <div class="field-label mono">PRE-TRADE CHECKLIST</div>
+      <div id="q-checklist-items"></div>
+    </div>
+
+    <div class="field">
+      <div class="field-label mono">OUTCOME</div>
+      <div class="status-row">
+        <button class="status-btn s-open mono" id="qs-open" onclick="qSetStatus('Open')">○ OPEN</button>
+        <button class="status-btn mono" id="qs-win" onclick="qSetStatus('Win')">✓ WIN</button>
+        <button class="status-btn mono" id="qs-loss" onclick="qSetStatus('Loss')">✗ LOSS</button>
+        <button class="status-btn mono" id="qs-be" onclick="qSetStatus('Breakeven')">≈ BE</button>
+      </div>
+    </div>
+
+    <div id="q-pnl-strip" style="display:none" class="auto-strip">
+      <div class="chip"><span class="chip-lbl mono">P&L</span><span class="chip-val big mono" id="q-chip-pnl"></span></div>
+    </div>
+
+    <div class="form-actions" style="margin-top:16px;padding-top:14px">
+      <button class="cancel-btn mono" onclick="document.getElementById('quick-modal').classList.remove('open')">CANCEL</button>
+      <button class="save-btn mono" id="q-save-btn" onclick="saveQuickTrade()">SAVE TRADE</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
@@ -370,13 +443,14 @@ const HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KE
 // ─── STATE ────────────────────────────────────────────────────────────────────
 const ACC_KEY = 'xauusd-j-account-v3';
 const SYMS = { USD:'$', GBP:'£', EUR:'€' };
-const CONFS = ["HTF Trend","BOS/CHoCH","Order Block","FVG","Liquidity Sweep","PDH/PDL","EMA Cross","Volume Spike","News Catalyst","Session Open","Support/Resistance","Golden Ratio","VWAP","Fibonacci"];
+const CONFS = ["10M Sweep","15M Sweep","30M Sweep","15M FVG","HTF Trend","BOS/CHoCH","Order Block","FVG","Liquidity Sweep","PDH/PDL","EMA Cross","Volume Spike","News Catalyst","Session Open","Support/Resistance","Golden Ratio","VWAP","Fibonacci"];
 const EMOTIONS = ["Disciplined","Confident","Neutral","Anxious","FOMO","Revenge"];
 
 let trades = [];
 let account = { balance:10000, riskPercent:1, currency:'USD' };
 let editId = null;
 let filterMode = 'All', filterDir = 'All', filterSession = 'All';
+let currentPair = 'GBPUSD';
 let formState = { mode:'backtest', direction:'Long', status:'Open', confluences:[], emotion:'Neutral' };
 
 // ─── SUPABASE API ─────────────────────────────────────────────────────────────
@@ -444,7 +518,8 @@ function tradeToDb(t){
     exit_price: t.exitPrice, exit_time: t.exitTime, status: t.status,
     setup: t.setup, confluences: t.confluences||[], rr: t.rr,
     pnl_dollars: t.pnlDollars, risk_dollars: t.riskDollars,
-    currency: t.currency||'USD', notes: t.notes, screenshot: t.screenshot, emotion: t.emotion
+    currency: t.currency||'USD', notes: t.notes, screenshot: t.screenshot,
+    emotion: t.emotion, pair: t.pair||'XAUUSD'
   };
 }
 function dbToTrade(d){
@@ -455,7 +530,8 @@ function dbToTrade(d){
     exitTime: d.exit_time, status: d.status, setup: d.setup,
     confluences: d.confluences||[], rr: d.rr, pnlDollars: d.pnl_dollars,
     riskDollars: d.risk_dollars, currency: d.currency||'USD',
-    notes: d.notes, screenshot: d.screenshot, emotion: d.emotion
+    notes: d.notes, screenshot: d.screenshot, emotion: d.emotion,
+    pair: d.pair||'XAUUSD'
   };
 }
 
@@ -468,6 +544,10 @@ function dbToTrade(d){
   document.getElementById('f-time').value = new Date().toTimeString().slice(0,5);
   await dbFetch();
   renderJournal();
+  // Set default pair placeholders for GBPUSD
+  document.getElementById('f-entry').placeholder='1.2650';
+  document.getElementById('f-sl').placeholder='1.2600';
+  document.getElementById('f-tp').placeholder='1.2750';
 })();
 
 function saveAccount(){ try{ localStorage.setItem(ACC_KEY, JSON.stringify(account)); }catch(e){} }
@@ -476,7 +556,14 @@ function saveAccount(){ try{ localStorage.setItem(ACC_KEY, JSON.stringify(accoun
 function calcPnL(dir,entry,exit,lots){
   const e=+entry,x=+exit,l=+lots;
   if(!e||!x||!l) return null;
-  return ((dir==='Long'?(x-e):(e-x))*l*100).toFixed(2);
+  const diff=dir==='Long'?(x-e):(e-x);
+  if(currentPair==='XAUUSD'){
+    // Gold: P&L = diff * lots * 100
+    return (diff*l*100).toFixed(2);
+  } else {
+    // Forex: P&L = diff * lots * 100000 / quote (simplified: diff/0.0001 * lots * 10)
+    return (diff/0.0001*l*10).toFixed(2);
+  }
 }
 function calcRR(entry,sl,tp){
   const e=+entry,s=+sl,t=+tp;
@@ -488,8 +575,17 @@ function calcLots(entry,sl,riskAmt){
   const e=+entry,s=+sl,r=+riskAmt;
   if(!e||!s||!r) return null;
   const slMove=Math.abs(e-s);
-  if(slMove<0.01) return null;
-  const lots=r/(slMove/0.01);
+  if(slMove===0) return null;
+  let lots;
+  if(currentPair==='XAUUSD'){
+    // Gold: pip=0.01, pip value=$1/lot → lots=risk/pips
+    const pips=slMove/0.01;
+    lots=r/pips;
+  } else {
+    // Forex (GBPUSD/EURUSD): pip=0.0001, pip value=$10/lot → lots=risk/(pips*10)
+    const pips=slMove/0.0001;
+    lots=r/(pips*10);
+  }
   if(lots>100) return '100.00';
   if(lots<0.01) return '0.01';
   return lots.toFixed(2);
@@ -512,6 +608,17 @@ function showView(name, navBtn){
   if(navBtn) navBtn.classList.add('active');
   else { const m={journal:0,add:1,stats:2}; if(m[name]!==undefined) document.querySelectorAll('.nav-btn')[m[name]].classList.add('active'); }
   document.getElementById('fab').style.display = name==='journal'?'flex':'none';
+  // Build rules checklist when entering new trade form
+  if(name==='add') buildNtChecklist();
+}
+
+function openQuickModal(){
+  initQuick();
+  document.getElementById('quick-modal').classList.add('open');
+}
+function closeQuickModal(e){
+  if(e.target===document.getElementById('quick-modal'))
+    document.getElementById('quick-modal').classList.remove('open');
 }
 
 // ─── JOURNAL ──────────────────────────────────────────────────────────────────
@@ -527,7 +634,7 @@ function setFilter(type,val,btn){
 
 function renderJournal(){
   const sym=SYMS[account.currency||'USD'];
-  const filtered=trades.filter(t=>(filterMode==='All'||t.mode===filterMode)&&(filterDir==='All'||t.direction===filterDir)&&(filterSession==='All'||t.session===filterSession));
+  const filtered=trades.filter(t=>t.pair===currentPair&&(filterMode==='All'||t.mode===filterMode)&&(filterDir==='All'||t.direction===filterDir)&&(filterSession==='All'||t.session===filterSession));
   document.getElementById('trade-count').textContent=filtered.length+' TRADES';
   const list=document.getElementById('trade-list');
   if(!filtered.length){
@@ -542,6 +649,7 @@ function renderJournal(){
         <div class="card-left">
           <span class="mode-badge mono ${t.mode==='live'?'mode-live':'mode-bt'}">${t.mode==='live'?'● LIVE':'◆ BT'}</span>
           <span class="dir-badge mono ${t.direction==='Long'?'dir-long':'dir-short'}">${t.direction==='Long'?'▲':'▼'} ${t.direction.toUpperCase()}</span>
+          <span class="pair-badge mono" style="font-size:8px;padding:2px 6px;border-radius:3px;background:#2a2a3a;color:#a78bfa;border:1px solid #a78bfa30">${t.pair||'XAUUSD'}</span>
           <span class="sess-tag mono">${t.session||''}</span>
           ${t.setup?`<span class="setup-tag mono">${t.setup}</span>`:''}
         </div>
@@ -676,7 +784,8 @@ function formCalc(){
   if(entry&&sl){ const al=calcLots(entry,sl,riskAmt); if(al) document.getElementById('f-lots').value=al; }
   const lots=+document.getElementById('f-lots').value;
   const rr=calcRR(entry,sl,tp);
-  const pips=entry&&sl?Math.round(Math.abs(entry-sl)/0.01):null;
+  const pipSize=currentPair==='XAUUSD'?0.01:0.0001;
+  const pips=entry&&sl?Math.round(Math.abs(entry-sl)/pipSize):null;
   const strip=document.getElementById('auto-strip');
   if(entry||sl||tp||lots){
     strip.style.display='flex';
@@ -752,6 +861,14 @@ async function saveTrade(){
   const entry=document.getElementById('f-entry').value;
   const date=document.getElementById('f-date').value;
   if(!entry||!date){ toast('Entry price and date required'); return; }
+  // Warn if rules not all checked
+  const rules=getRules();
+  const allChecked=rules.length===0||rules.every((_,i)=>ntCheckedRules[i]);
+  if(!allChecked&&rules.length>0){
+    const unchecked=rules.filter((_,i)=>!ntCheckedRules[i]);
+    const proceed=confirm('⚠️ '+unchecked.length+' rule'+(unchecked.length>1?'s':'')+' not checked:\n\n'+unchecked.map(r=>'• '+r).join('\n')+'\n\nProceed anyway?');
+    if(!proceed) return;
+  }
   document.getElementById('save-btn').textContent='SAVING...';
   document.getElementById('save-btn').disabled=true;
   const riskAmt=account.balance*account.riskPercent/100;
@@ -768,6 +885,7 @@ async function saveTrade(){
     emotion:formState.emotion, rr:rr||'', pnlDollars:pnl!==null?pnl:'',
     riskDollars:riskAmt.toFixed(2), currency:account.currency||'USD',
     notes:document.getElementById('f-notes').value, screenshot:document.getElementById('f-ss').value,
+    pair:currentPair,
   };
   let ok;
   if(editId!==null){ ok=await dbUpdateSafe(trade); if(ok) trades=trades.map(t=>t.id===editId?trade:t); }
@@ -786,7 +904,7 @@ async function saveTrade(){
 // ─── STATS ────────────────────────────────────────────────────────────────────
 function renderStats(){
   const sym=SYMS[account.currency||'USD'];
-  const closed=trades.filter(t=>t.status!=='Open'&&t.pnlDollars!=='');
+  const closed=trades.filter(t=>t.pair===currentPair&&t.status!=='Open'&&t.pnlDollars!=='');
   const open=trades.filter(t=>t.status==='Open');
   if(!closed.length){
     // ── WEEKLY P&L ──
@@ -1409,10 +1527,32 @@ function exportCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows],{type:'text/csv'}));a.download='xauusd_journal.csv';a.click();
 }
 
+// ─── PAIR SWITCHING ──────────────────────────────────────────────────────────
+function switchPair(pair, btn){
+  currentPair = pair;
+  document.querySelectorAll('.pair-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Reset filters
+  filterMode='All'; filterDir='All'; filterSession='All';
+  document.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.filter-grp:first-child .pill:first-child').forEach(b=>b.classList.add('active'));
+  document.querySelectorAll('.filter-grp:nth-child(2) .pill:first-child').forEach(b=>b.classList.add('active'));
+  renderJournal();
+  updateHeader();
+  // Update placeholder prices based on pair
+  const entryPH = pair==='XAUUSD'?'2345.00':pair==='GBPUSD'?'1.2650':'1.0850';
+  const slPH = pair==='XAUUSD'?'2335.00':pair==='GBPUSD'?'1.2600':'1.0800';
+  const tpPH = pair==='XAUUSD'?'2365.00':pair==='GBPUSD'?'1.2750':'1.0950';
+  document.getElementById('f-entry').placeholder=entryPH;
+  document.getElementById('f-sl').placeholder=slPH;
+  document.getElementById('f-tp').placeholder=tpPH;
+  toast('Switched to '+pair.slice(0,3)+'/'+pair.slice(3));
+}
+
 // ─── HEADER ───────────────────────────────────────────────────────────────────
 function updateHeader(){
   const sym=SYMS[account.currency||'USD'];
-  const closed=trades.filter(t=>t.status!=='Open'&&t.pnlDollars!=='');
+  const closed=trades.filter(t=>t.pair===currentPair&&t.status!=='Open'&&t.pnlDollars!=='');
   const totalPnL=closed.reduce((s,t)=>s+parseFloat(t.pnlDollars||0),0);
   const curBal=account.balance+totalPnL;
   const el=document.getElementById('hdr-bal');
@@ -1443,6 +1583,264 @@ function setRiskPct(v,btn){ document.getElementById('s-risk').value=v; document.
 function syncRiskPills(){ const v=parseFloat(document.getElementById('s-risk').value); document.querySelectorAll('.risk-pill').forEach(b=>b.classList.toggle('active',parseFloat(b.textContent)===v)); }
 function updateRiskPreview(){ const sym=SYMS[account.currency||'USD'],bal=parseFloat(document.getElementById('s-balance').value)||0,rp=parseFloat(document.getElementById('s-risk').value)||0; document.getElementById('risk-preview').innerHTML='Risk per trade: <strong style="color:#e2c87b">'+sym+(bal*rp/100).toFixed(2)+' '+(account.currency||'USD')+'</strong>'; }
 function saveSettings(){ account.balance=parseFloat(document.getElementById('s-balance').value)||10000; account.riskPercent=parseFloat(document.getElementById('s-risk').value)||1; saveAccount(); updateHeader(); updateRiskBanner(); formCalc(); closeSettings(); toast('Settings saved ✓'); }
+
+// ─── RULES ───────────────────────────────────────────────────────────────────
+const RULES_KEY='xauusd-rules';
+function getRules(){ try{return JSON.parse(localStorage.getItem(RULES_KEY)||'[]');}catch(e){return[];} }
+function saveRules(r){ localStorage.setItem(RULES_KEY,JSON.stringify(r)); }
+
+function renderRules(){
+  const rules=getRules();
+  const list=document.getElementById('rules-list');
+  if(!rules.length){
+    list.innerHTML=`<div style="text-align:center;padding:30px;color:#444;font-size:11px;font-family:'Space Mono',monospace">No rules yet — add your first rule below</div>`;
+    return;
+  }
+  list.innerHTML=rules.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#111115;border:1px solid #1e1e28;border-radius:6px;margin-bottom:8px">
+      <span style="font-size:12px;color:#e2c87b;font-family:'Space Mono',monospace;min-width:20px">${i+1}.</span>
+      <span style="flex:1;font-size:12px;color:#ccc">${r}</span>
+      <button onclick="deleteRule(${i})" style="background:none;border:none;color:#444;cursor:pointer;font-size:14px;padding:2px 6px" title="Delete">✕</button>
+    </div>`).join('');
+}
+
+function addRule(){
+  const inp=document.getElementById('new-rule-input');
+  const val=inp.value.trim();
+  if(!val) return;
+  const rules=getRules();
+  rules.push(val);
+  saveRules(rules);
+  inp.value='';
+  renderRules();
+  // refresh checklist in quick log if visible
+  buildQChecklist();
+  toast('Rule added ✓');
+}
+
+function deleteRule(i){
+  const rules=getRules();
+  rules.splice(i,1);
+  saveRules(rules);
+  renderRules();
+  buildQChecklist();
+}
+
+// ─── RULES IN NEW TRADE FORM ─────────────────────────────────────────────────
+function toggleRulesPanel(){
+  const panel=document.getElementById('rules-panel');
+  const btn=document.getElementById('rules-toggle-btn');
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  btn.textContent=open?'MANAGE ▴':'MANAGE ▾';
+  if(open) renderNtRules();
+}
+
+function renderNtRules(){
+  const rules=getRules();
+  const list=document.getElementById('nt-rules-list');
+  if(!rules.length){
+    list.innerHTML=`<div style="font-size:10px;color:#444;font-family:'Space Mono',monospace;padding:8px 0">No rules yet — add one below</div>`;
+    return;
+  }
+  list.innerHTML=rules.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d10;border:1px solid #1e1e28;border-radius:5px;margin-bottom:6px">
+      <span style="font-size:11px;color:#ccc;flex:1">${r}</span>
+      <button onclick="ntDeleteRule(${i})" style="background:none;border:none;color:#444;cursor:pointer;font-size:13px">✕</button>
+    </div>`).join('');
+}
+
+function ntAddRule(){
+  const inp=document.getElementById('nt-new-rule-input');
+  const val=inp.value.trim(); if(!val) return;
+  const rules=getRules(); rules.push(val); saveRules(rules);
+  inp.value=''; renderNtRules(); buildNtChecklist(); buildQChecklist(); toast('Rule added ✓');
+}
+
+function ntDeleteRule(i){
+  const rules=getRules(); rules.splice(i,1); saveRules(rules);
+  renderNtRules(); buildNtChecklist(); buildQChecklist();
+}
+
+function buildNtChecklist(){
+  const rules=getRules();
+  const wrap=document.getElementById('nt-checklist-wrap');
+  const container=document.getElementById('nt-checklist-items');
+  if(!rules.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  container.innerHTML=rules.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#111115;border:1px solid #1e1e28;border-radius:5px;margin-bottom:6px;cursor:pointer" onclick="toggleNtCheck(${i},this)">
+      <div style="width:16px;height:16px;border:1.5px solid #333;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="ntcheck-box-${i}"></div>
+      <span style="font-size:11px;color:#888;font-family:'Space Mono',monospace" id="ntcheck-lbl-${i}">${r}</span>
+    </div>`).join('');
+}
+
+let ntCheckedRules={};
+function toggleNtCheck(i,el){
+  ntCheckedRules[i]=!ntCheckedRules[i];
+  const box=document.getElementById('ntcheck-box-'+i);
+  const lbl=document.getElementById('ntcheck-lbl-'+i);
+  if(ntCheckedRules[i]){
+    box.style.background='#e2c87b'; box.style.borderColor='#e2c87b';
+    box.innerHTML='<span style="font-size:10px;color:#0a0a0c;font-weight:700">✓</span>';
+    lbl.style.color='#e2c87b'; el.style.borderColor='#e2c87b33';
+  } else {
+    box.style.background=''; box.style.borderColor='#333';
+    box.innerHTML=''; lbl.style.color='#888'; el.style.borderColor='#1e1e28';
+  }
+}
+
+function buildQChecklist(){
+  const rules=getRules();
+  const wrap=document.getElementById('q-checklist-wrap');
+  const container=document.getElementById('q-checklist-items');
+  if(!rules.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  container.innerHTML=rules.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#111115;border:1px solid #1e1e28;border-radius:5px;margin-bottom:6px;cursor:pointer" onclick="toggleCheck(${i},this)" id="qcheck-${i}">
+      <div style="width:16px;height:16px;border:1.5px solid #333;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s" id="qcheck-box-${i}"></div>
+      <span style="font-size:11px;color:#888;font-family:'Space Mono',monospace" id="qcheck-lbl-${i}">${r}</span>
+    </div>`).join('');
+}
+
+let checkedRules={};
+function toggleCheck(i, el){
+  checkedRules[i]=!checkedRules[i];
+  const box=document.getElementById('qcheck-box-'+i);
+  const lbl=document.getElementById('qcheck-lbl-'+i);
+  if(checkedRules[i]){
+    box.style.background='#e2c87b'; box.style.borderColor='#e2c87b';
+    box.innerHTML='<span style="font-size:10px;color:#0a0a0c;font-weight:700">✓</span>';
+    lbl.style.color='#e2c87b'; el.style.borderColor='#e2c87b33';
+  } else {
+    box.style.background=''; box.style.borderColor='#333';
+    box.innerHTML=''; lbl.style.color='#888'; el.style.borderColor='#1e1e28';
+  }
+}
+
+// ─── QUICK LOG ────────────────────────────────────────────────────────────────
+let qState={ mode:'backtest', direction:'Long', status:'Open' };
+
+function initQuick(){
+  qState={ mode:'backtest', direction:'Long', status:'Open' };
+  checkedRules={};
+  ntCheckedRules={};
+  document.getElementById('q-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('q-time').value=new Date().toTimeString().slice(0,5);
+  document.getElementById('q-session').value=detectSession(new Date().toTimeString().slice(0,5));
+  ['q-entry','q-sl','q-tp'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('q-auto-strip').style.display='none';
+  document.getElementById('q-pnl-strip').style.display='none';
+  document.getElementById('q-save-btn').textContent='SAVE TRADE';
+  qUpdateSegMode(); qUpdateStatusBtns();
+  buildQChecklist();
+}
+
+function qSegClick(field,val,btn){
+  qState[field]=val; qUpdateSegMode(); qCalc();
+}
+function qUpdateSegMode(){
+  document.querySelectorAll('#q-seg-mode .seg-btn').forEach((b,i)=>{
+    b.className='seg-btn mono';
+    if(['backtest','live'][i]===qState.mode) b.classList.add('active');
+  });
+}
+function qTimeChange(){
+  const t=document.getElementById('q-time').value;
+  document.getElementById('q-session').value=detectSession(t);
+  qCalc();
+}
+function qSetStatus(s){
+  qState.status=s; qUpdateStatusBtns();
+  const entry=+document.getElementById('q-entry').value;
+  const sl=+document.getElementById('q-sl').value;
+  const tp=+document.getElementById('q-tp').value;
+  const lots=+calcLots(entry,sl,account.balance*account.riskPercent/100)||0;
+  const exitPrice=s==='Win'?tp:s==='Loss'?sl:s==='Breakeven'?entry:0;
+  const pnl=exitPrice&&s!=='Open'?calcPnL(qState.direction,entry,exitPrice,lots):null;
+  const strip=document.getElementById('q-pnl-strip');
+  if(pnl!==null&&s!=='Open'){
+    strip.style.display='flex';
+    strip.className='auto-strip '+(parseFloat(pnl)>=0?'pnl-win':'pnl-loss');
+    const cp=document.getElementById('q-chip-pnl');
+    cp.textContent=(parseFloat(pnl)>0?'+':'')+pnl+' '+(account.currency||'USD');
+    cp.style.color=parseFloat(pnl)>=0?'#4ade80':'#f87171';
+  } else strip.style.display='none';
+}
+function qUpdateStatusBtns(){
+  [['qs-open','s-open','Open'],['qs-win','s-win','Win'],['qs-loss','s-loss','Loss'],['qs-be','s-be','Breakeven']].forEach(([id,cls,val])=>{
+    const b=document.getElementById(id); b.className='status-btn mono'; if(qState.status===val) b.classList.add(cls);
+  });
+}
+function qCalc(){
+  const sym=SYMS[account.currency||'USD'];
+  const entry=+document.getElementById('q-entry').value;
+  const sl=+document.getElementById('q-sl').value;
+  const tp=+document.getElementById('q-tp').value;
+  const riskAmt=account.balance*account.riskPercent/100;
+  const strip=document.getElementById('q-auto-strip');
+  if(entry&&sl){
+    // Auto direction
+    const autoDir=sl<entry?'Long':'Short';
+    if(autoDir!==qState.direction){ qState.direction=autoDir; }
+    const lots=calcLots(entry,sl,riskAmt);
+    const rr=calcRR(entry,sl,tp);
+    strip.style.display='flex';
+    document.getElementById('q-chip-dir').textContent=qState.direction;
+    document.getElementById('q-chip-dir').style.color=qState.direction==='Long'?'#4ade80':'#f87171';
+    document.getElementById('q-chip-lot').textContent=lots||'—';
+    document.getElementById('q-chip-rr').textContent=rr?'1:'+rr:'—';
+    document.getElementById('q-chip-risk').textContent=sym+riskAmt.toFixed(2);
+  } else strip.style.display='none';
+}
+
+async function saveQuickTrade(){
+  const entry=document.getElementById('q-entry').value;
+  const date=document.getElementById('q-date').value;
+  if(!entry||!date){ toast('Entry price and date required'); return; }
+  // Warn if rules not all checked
+  const rules=getRules();
+  const allChecked=rules.length===0||rules.every((_,i)=>checkedRules[i]);
+  if(!allChecked&&rules.length>0){
+    const unchecked=rules.filter((_,i)=>!checkedRules[i]);
+    const proceed=confirm('⚠️ '+unchecked.length+' rule'+(unchecked.length>1?'s':'')+' not checked:\n\n'+unchecked.map(r=>'• '+r).join('\n')+'\n\nProceed anyway?');
+    if(!proceed) return;
+  }
+  document.getElementById('q-save-btn').textContent='SAVING...';
+  document.getElementById('q-save-btn').disabled=true;
+  const sl=document.getElementById('q-sl').value;
+  const tp=document.getElementById('q-tp').value;
+  const riskAmt=account.balance*account.riskPercent/100;
+  const lots=calcLots(entry,sl,riskAmt)||'';
+  const exitPrice=qState.status==='Win'?tp:qState.status==='Loss'?sl:qState.status==='Breakeven'?entry:'';
+  const pnl=exitPrice&&qState.status!=='Open'?calcPnL(qState.direction,+entry,+exitPrice,+lots):null;
+  const rr=calcRR(+entry,+sl,+tp);
+  const checkedList=rules.filter((_,i)=>checkedRules[i]);
+  const uncheckedList=rules.filter((_,i)=>!checkedRules[i]);
+  const notesAuto=uncheckedList.length?'Rules skipped: '+uncheckedList.join(', '):'';
+  const trade={
+    id:Date.now(), mode:qState.mode, date,
+    time:document.getElementById('q-time').value,
+    session:document.getElementById('q-session').value,
+    direction:qState.direction, status:qState.status,
+    entryPrice:entry, stopLoss:sl, takeProfit:tp,
+    lotSize:lots, exitPrice, exitTime:'',
+    setup:'', confluences:[], emotion:'Neutral',
+    rr:rr||'', pnlDollars:pnl!==null?pnl:'',
+    riskDollars:riskAmt.toFixed(2), currency:account.currency||'USD',
+    notes:notesAuto, screenshot:'',
+    pair:currentPair,
+  };
+  const ok=await dbInsertSafe(trade);
+  document.getElementById('q-save-btn').disabled=false;
+  document.getElementById('q-save-btn').textContent='SAVE TRADE';
+  if(ok){
+    trades.unshift(trade);
+    showView('journal',null); renderJournal(); updateHeader();
+    toast('Trade saved ✓');
+    checkConsecutiveLosses();
+  }
+}
 
 // ─── CONSECUTIVE LOSS ALERT ──────────────────────────────────────────────────
 function checkConsecutiveLosses(){
