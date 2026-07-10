@@ -893,7 +893,18 @@ async function saveTrade(){
   document.getElementById('save-btn').disabled=false;
   if(ok){
     const wasEdit = editId !== null;
-    editId=null; showView('journal',null); renderJournal(); updateHeader();
+    editId=null;
+    // Reset form so next trade starts fresh
+    formState={mode:'backtest',direction:'Long',status:'Open',confluences:[],emotion:'Neutral'};
+    ntCheckedRules={};
+    ['f-entry','f-sl','f-tp','f-lots','f-exit','f-exit-time','f-notes','f-ss'].forEach(id=>{document.getElementById(id).value='';});
+    document.getElementById('f-setup').value='';
+    document.getElementById('exit-hint').textContent='';
+    document.getElementById('auto-strip').style.display='none';
+    document.getElementById('pnl-strip').style.display='none';
+    document.getElementById('warn-lot').style.display='none';
+    document.getElementById('warn-side').style.display='none';
+    showView('journal',null); renderJournal(); updateHeader();
     toast(wasEdit?'Trade updated ✓':'Trade saved ✓');
     checkConsecutiveLosses();
   } else {
